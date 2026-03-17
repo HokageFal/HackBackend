@@ -16,8 +16,4 @@ structlog
 celery[redis]
 redis
 email-validator
-authlib
-itsdangerous
-google-auth
-google-auth-oauthlib
 sqladmin[full]

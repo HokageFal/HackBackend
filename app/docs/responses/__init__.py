@@ -5,11 +5,6 @@
 следующие единому формату проекта.
 """
 
-from .google_responses import (
-    GOOGLE_LOGIN_RESPONSES,
-    GOOGLE_CALLBACK_RESPONSES
-)
-
 from .user_responses import (
     USER_REGISTER_RESPONSES,
     USER_LOGIN_RESPONSES,
@@ -24,10 +19,6 @@ from .otp_responses import (
 )
 
 __all__ = [
-    # Google OAuth responses
-    "GOOGLE_LOGIN_RESPONSES",
-    "GOOGLE_CALLBACK_RESPONSES",
-    
     # User responses
     "USER_REGISTER_RESPONSES",
     "USER_LOGIN_RESPONSES",

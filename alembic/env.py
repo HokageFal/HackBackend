@@ -9,9 +9,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 # Загружаем Base и модели
 from app.database.core import Base
 from app.database.models.users import User
-from app.database.models.subscription_plans import SubscriptionPlan
-from app.database.models.user_subscriptions import UserSubscription
-from app.database.models.token_ledger import TokenTransaction
 
 # Загружаем переменные окружения из .env
 from dotenv import load_dotenv

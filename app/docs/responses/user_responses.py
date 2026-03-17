@@ -535,8 +535,7 @@ USER_BY_ID_SUCCESS = {
                         "email": "john@example.com",
                         "avatar_url": "https://example.com/avatar.jpg",
                         "is_admin": False,
-                        "created_at": "2024-01-15T10:30:00",
-                        "token_balance": 0
+                        "created_at": "2024-01-15T10:30:00"
                     },
                     "errors": None
                 }

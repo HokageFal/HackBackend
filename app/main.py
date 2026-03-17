@@ -11,17 +11,13 @@ import os
 
 from app.routers.user_router import router as user_router
 from app.routers.otp_router import router as otp_router
-from app.routers.google_router import router as google_router
-from app.routers.telegram_router import router as telegram_router
-from app.routers.github_router import router as github_router
 from app.routers.password_reset_router import router as password_reset_router
-from app.routers.subscription_router import router as subs_router
 
 # Импорты для админки
 from sqladmin import Admin
 from sqlalchemy.ext.asyncio import create_async_engine
 from app.core.config import settings
-from app.admin.views import UserAdmin, SubscriptionPlanAdmin, UserSubscriptionAdmin, TokenTransactionAdmin
+from app.admin.views import UserAdmin
 from app.admin.auth import AdminAuth
 import logging
 
@@ -49,8 +45,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AI Landing Generator API",
     version="1.0.0",
-    docs_url=None,
-    redoc_url=None,
     description="API для генерации лендингов с системой аутентификации и OTP верификации",
     lifespan=lifespan
 )
@@ -92,10 +86,6 @@ app.add_middleware(
 app.include_router(user_router, tags=["Users"])
 app.include_router(otp_router, tags=["OTP"])
 app.include_router(password_reset_router, tags=["Password Reset"])
-app.include_router(google_router, tags=["OAuth"])
-app.include_router(telegram_router, tags=["OAuth"])
-app.include_router(github_router, tags=["OAuth"])
-app.include_router(subs_router, tags=["SubsPlans"])
 
 
 def setup_admin(app: FastAPI):
@@ -135,9 +125,6 @@ def setup_admin(app: FastAPI):
         logger.info("Экземпляр админ-панели создан")
 
         admin.add_view(UserAdmin)
-        admin.add_view(SubscriptionPlanAdmin)
-        admin.add_view(UserSubscriptionAdmin)
-        admin.add_view(TokenTransactionAdmin)
 
         global admin_instance
         admin_instance = admin
@@ -194,14 +181,6 @@ async def health_check():
         "service": "AI Landing Generator API",
         "admin_available": admin_instance is not None
     }
-
-
-APIDOG_DOCS_URL = "https://app.apidog.com/project/1080151"
-
-
-@app.get("/docs", include_in_schema=False)
-def redirect_to_apidog():
-    return RedirectResponse(url=APIDOG_DOCS_URL)
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

@@ -36,7 +36,6 @@ services:
       - "127.0.0.1:8000:8000"
     command: >
       sh -c "
-      python /code/update_apidog.py &&
       exec uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
@@ -62,8 +61,6 @@ services:
       --schedule=/tmp/celerybeat-schedule
     environment:
       <<: *app-env
-      APIDOG_PROJECT_ID: ${APIDOG_PROJECT_ID}
-      APIDOG_API_KEY: ${APIDOG_API_KEY}
 
   redis:
     image: redis:7.0-alpine

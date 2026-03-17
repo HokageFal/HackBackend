@@ -225,7 +225,7 @@ PASSWORD_RESET_VERIFY_INVALID_CODE_ERROR = {
                                 {
                                     "type": "business_error",
                                     "field": "auth_provider",
-                                    "message": "Невозможно сбросить пароль для пользователя с авторизацией через google",
+                                    "message": "Невозможно сбросить пароль для пользователя с авторизацией не через email",
                                     "input": "user@example.com",
                                     "ctx": {
                                         "reason": "Invalid operation for OAuth user"

@@ -12,7 +12,6 @@ celery_app = Celery(
     backend=REDIS_URL,
     include=[
         "app.tasks.email_tasks",
-        "app.tasks.subscription_tasks",  # ДОБАВЬТЕ СЮДА ПУТЬ К ВАШЕМУ ФАЙЛУ С ЗАДАЧЕЙ
     ]
 )
 
@@ -41,12 +40,7 @@ celery_app.conf.update(
 
 celery_app.autodiscover_tasks(["app.tasks"])
 
-celery_app.conf.beat_schedule = {
-    "deactivate-expired-subscriptions-every-5-min": {
-        "task": "subscriptions.deactivate_expired",
-        "schedule": 300.0,
-    },
-}
+celery_app.conf.beat_schedule = {}
 
 if __name__ == "__main__":
     celery_app.start()
