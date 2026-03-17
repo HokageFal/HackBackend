@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Landify Auth Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+        }
+        .auth-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .btn-google {
+            display: inline-block;
+            background-color: #4285F4;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .btn-google:hover {
+            background-color: #357ae8;
+        }
+        h1 { color: #333; }
+        p { color: #666; margin-bottom: 30px; }
+        .divider { margin: 20px 0; color: #ccc; }
+    </style>
+</head>
+<body>
+
+<div class="auth-container">
+    <h1>Landify AI</h1>
+    <p>Выберите способ входа для теста</p>
+
+    <!-- КНОПКА GOOGLE -->
+    <a href="https://dev.landify-ai.ru/api/auth/google/login" class="btn-google">
+        Войти через Google
+    </a>
+
+    <div class="divider">или</div>
+
+    <!-- КНОПКА TELEGRAM -->
+    <!-- Замени ТВОЙ_БОТ_ДЛЯ_DEV на имя своего бота -->
+    <script async
+        src="https://telegram.org/js/telegram-widget.js?22"
+        data-telegram-login="landify_dev_bot"
+        data-size="large"
+        data-auth-url="https://dev.landify-ai.ru/api/auth/telegram/callback"
+        data-request-access="write">
+    </script>
+</div>
+
+<script>
+    // Этот скрипт поможет увидеть ошибку в консоли, если что-то пойдет не так
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('access_token')) {
+        console.log("Успешный вход!");
+        console.log("Token:", urlParams.get('access_token'));
+        alert("Авторизация прошла успешно! Токен в консоли.");
+    }
+</script>
+
+</body>
+</html>

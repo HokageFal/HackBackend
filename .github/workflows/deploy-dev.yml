@@ -1,0 +1,203 @@
+name: CI/CD FastAPI Docker with Migrations
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  deploy:
+    name: "Build & Deploy with Migrations"
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Клонируем репозиторий
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Определяем TARGET_DIR по ветке
+      - name: Set target directory and environment
+        id: set_target
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "BRANCH=main" >> $GITHUB_ENV
+            echo "TARGET_DIR=/var/www/backend/main" >> $GITHUB_ENV
+          else
+            echo "BRANCH=dev" >> $GITHUB_ENV
+            echo "TARGET_DIR=/var/www/backend/dev" >> $GITHUB_ENV
+          fi
+          echo "Deploying branch ${{ env.BRANCH }} to ${{ env.TARGET_DIR }}"
+
+      # 3. Добавляем сервер в known_hosts
+      - name: Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      # 4. Копируем файлы на сервер
+      - name: Copy files to server
+        run: |
+          echo "${{ secrets.SSH_KEY }}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+          rsync -avz \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.env' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            -e "ssh -i ssh_key.pem -o StrictHostKeyChecking=no" \
+            ./ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.TARGET_DIR }}/
+          rm -f ssh_key.pem
+
+      # 5. Деплой и выполнение миграций на сервере
+      - name: Deploy and run migrations on server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          envs: TARGET_DIR,BRANCH
+          script: |
+            set -e  # Выход при ошибке
+            
+            echo "🚀 Starting deployment for branch: $BRANCH"
+            echo "📂 Target directory: $TARGET_DIR"
+            
+            # Переходим в директорию проекта
+            cd $TARGET_DIR
+            
+            # Проверяем наличие необходимых файлов
+            if [ ! -f "docker-compose.yml" ]; then
+              echo "❌ docker-compose.yml not found!"
+              exit 1
+            fi
+            
+            if [ ! -f "alembic.ini" ]; then
+              echo "❌ alembic.ini not found!"
+              exit 1
+            fi
+            
+            echo "✅ Required files found"
+            
+            # Останавливаем старые контейнеры
+            echo "🛑 Stopping old containers..."
+            docker-compose down --remove-orphans || true
+            
+            # Очищаем старые образы чтобы избежать проблем с кэшем
+            echo "🧹 Cleaning old images..."
+            docker system prune -f || true
+            
+            # Собираем образы с ретраями
+            echo "🔨 Building containers (attempt 1)..."
+            if ! docker-compose build; then
+              echo "⚠️ Build attempt 1 failed, retrying..."
+              sleep 5
+              echo "🔨 Building containers (attempt 2)..."
+              docker-compose build
+            fi
+            
+            # Запускаем только БД для миграций
+            echo "🐘 Starting database only..."
+            docker-compose up -d db
+            
+            # Ждем пока БД станет доступной
+            echo "⏳ Waiting for database to be ready..."
+            for i in {1..30}; do
+              if docker-compose exec -T db pg_isready -U postgres -d postgres; then
+                echo "✅ Database is ready!"
+                break
+              fi
+              echo "⏱️ Waiting for database... ($i/30)"
+              sleep 2
+            done
+            
+            # Даем дополнительное время для полной инициализации
+            sleep 5
+            
+            # Запускаем web сервис для выполнения миграций
+            echo "🚀 Starting web service for migrations..."
+            docker-compose up -d web
+            
+            # Ждем пока web сервис станет доступным
+            echo "⏳ Waiting for web service to be ready..."
+            for i in {1..30}; do
+              if docker-compose ps web | grep -q "Up"; then
+                echo "✅ Web service is running!"
+                
+                # Проверяем, отвечает ли приложение
+                if curl -s -f http://localhost:8000/docs > /dev/null 2>&1; then
+                  echo "✅ FastAPI docs are accessible!"
+                  break
+                else
+                  echo "⏱️ App starting... ($i/30)"
+                fi
+              else
+                echo "⏱️ Waiting for web service... ($i/30)"
+              fi
+              sleep 3
+            done
+            
+            # Запускаем миграции
+            echo "🔄 Running database migrations..."
+            
+            # Выполняем миграции
+            echo "⬆️ Applying migrations..."
+            if docker-compose exec -T web alembic upgrade head; then
+              echo "✅ Migrations applied successfully!"
+            else
+              echo "❌ Migration failed!"
+              exit 1
+            fi
+            
+            # Запускаем все остальные сервисы
+            echo "🐳 Starting all services..."
+            docker-compose up -d
+            
+            # Проверяем здоровье сервисов
+            echo "🏥 Checking services health..."
+            sleep 10
+            
+            # Проверяем статус контейнеров
+            echo "📋 Running containers:"
+            docker-compose ps
+            
+            # Проверяем доступность приложения
+            echo "🔍 Checking application availability..."
+            
+            if curl -s -f http://localhost:8000/docs > /dev/null 2>&1; then
+              echo "✅ FastAPI docs are accessible!"
+            elif curl -s -f http://localhost:8000/redoc > /dev/null 2>&1; then
+              echo "✅ FastAPI redoc is accessible!"
+            else
+              echo "⚠️ Standard endpoints not available, but deployment completed."
+              echo "📋 Web container logs:"
+              docker-compose logs web --tail=10
+            fi
+            
+            # Очистка
+            echo "🧹 Final cleanup..."
+            docker image prune -af
+            
+            echo "🎉 Deployment completed successfully for branch: $BRANCH"
+            
+            # Финальная информация
+            echo "📊 Final status:"
+            docker-compose ps
+            echo "🌐 Application should be available at: http://localhost:8000"
+
+      - name: Final verification
+        run: |
+          echo "${{ secrets.SSH_KEY }}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+          echo "🔍 Final deployment verification..."
+          ssh -i ssh_key.pem -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd ${{ env.TARGET_DIR }} && 
+            echo '📋 Container status:' && 
+            docker-compose ps && 
+            echo '🔍 Checking web service:' && 
+            curl -s http://localhost:8000/docs > /dev/null && echo '✅ Docs available' || echo '⚠️ Docs not available (check logs with: docker-compose logs web)'"
+          rm -f ssh_key.pem
