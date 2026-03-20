@@ -53,7 +53,6 @@ def generate_auth_tokens(user: User) -> tuple[str, str]:
 
 
 async def login_user(session: AsyncSession, user_login: UserLogin, response: Response) -> dict:
-
     logger.info(
         "Starting user login",
         operation="login_user",
@@ -144,19 +143,6 @@ async def login_user(session: AsyncSession, user_login: UserLogin, response: Res
 
 
 async def update_access(request: Request, response: Response) -> dict:
-    """
-    Обновляет access токен используя refresh токен из cookies.
-    
-    Args:
-        request: FastAPI Request для получения cookies
-        response: FastAPI Response для установки новых cookies
-        
-    Returns:
-        Dict с новыми токенами
-        
-    Raises:
-        InvalidCredentials: Невалидный или истекший токен
-    """
     logger.info(
         "Starting access token refresh",
         operation="update_access",

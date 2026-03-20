@@ -14,19 +14,6 @@ logger = get_logger(__name__)
 
 
 async def get_current_user_service(session: AsyncSession, user_id: int) -> User:
-    """
-    Получает текущего пользователя по ID.
-    
-    Args:
-        session: Сессия базы данных
-        user_id: ID пользователя
-        
-    Returns:
-        Объект пользователя
-        
-    Raises:
-        UserNotFound: Пользователь не найден
-    """
     logger.info(
         "Starting current user retrieval",
         operation="get_current_user_service",
@@ -131,21 +118,6 @@ async def update_user_profile_service(
     about_markdown: str | None = None,
     photo_url: str | None = None
 ) -> User:
-    """
-    Обновляет профиль психолога.
-    
-    Args:
-        session: Сессия базы данных
-        user_id: ID пользователя
-        about_markdown: Описание в Markdown (опционально)
-        photo_url: URL фото (опционально)
-        
-    Returns:
-        Обновленный объект пользователя
-        
-    Raises:
-        UserNotFound: Пользователь не найден
-    """
     logger.info(
         "Starting user profile update",
         operation="update_user_profile_service",
