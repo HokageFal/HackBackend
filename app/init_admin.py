@@ -16,21 +16,17 @@ logger = logging.getLogger(__name__)
 
 
 def generate_random_password(length: int = 16) -> str:
-    """Генерирует безопасный случайный пароль."""
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
     password = ''.join(secrets.choice(alphabet) for _ in range(length))
     return password
 
 
 def generate_admin_email() -> str:
-    """Генерирует email для админа с префиксом admin."""
     random_suffix = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(8))
     return f"admin{random_suffix}@profdna.ru"
 
 
 def init_admin():
-    """Проверяет и создает администратора если его нет."""
-    
     try:
         # Синхронное подключение к БД
         sync_db_url = settings.DATABASE_URL.replace("+asyncpg", "")
@@ -43,7 +39,7 @@ def init_admin():
             existing_admin = result.scalars().first()
             
             if existing_admin:
-                logger.info(f"✅ Администратор существует: {existing_admin.email}")
+                logger.info(f"Администратор существует: {existing_admin.email}")
                 return
             
             # Создаем нового админа
@@ -68,21 +64,21 @@ def init_admin():
             session.refresh(admin)
             
             logger.info("=" * 70)
-            logger.info("🎉 АДМИНИСТРАТОР СОЗДАН!")
+            logger.info("Администратор создан")
             logger.info("=" * 70)
-            logger.info(f"📧 Email:    {admin_email}")
-            logger.info(f"🔑 Пароль:   {admin_password}")
-            logger.info(f"👤 ФИО:      {admin_full_name}")
-            logger.info(f"📱 Телефон:  {admin_phone}")
-            logger.info(f"🆔 ID:       {admin.id}")
+            logger.info(f"Email: {admin_email}")
+            logger.info(f"Пароль: {admin_password}")
+            logger.info(f"ФИО: {admin_full_name}")
+            logger.info(f"Телефон: {admin_phone}")
+            logger.info(f"ID: {admin.id}")
             logger.info("=" * 70)
-            logger.info("⚠️  СОХРАНИТЕ ЭТИ ДАННЫЕ!")
+            logger.info("Сохраните эти данные")
             logger.info("=" * 70)
         
         engine.dispose()
     
     except Exception as e:
-        logger.error(f"⚠️  Ошибка инициализации админа: {e}", exc_info=True)
+        logger.error(f"Ошибка инициализации админа: {e}", exc_info=True)
 
 
 if __name__ == "__main__":

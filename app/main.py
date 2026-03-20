@@ -28,7 +28,6 @@ app = FastAPI(
 
 @app.on_event("startup")
 def startup_event():
-    """Выполняется при запуске приложения."""
     logger.info("Запуск приложения...")
     try:
         init_admin()
@@ -38,7 +37,6 @@ def startup_event():
 
 @app.on_event("shutdown")
 def shutdown_event():
-    """Выполняется при остановке приложения."""
     logger.info("Остановка приложения...")
 
 

@@ -8,15 +8,6 @@ logger = get_logger(__name__)
 
 
 def send_email_sync(to_email: str, subject: str, body: str, is_html: bool = True):
-    """
-    Синхронная отправка email.
-    
-    Args:
-        to_email: Email получателя
-        subject: Тема письма
-        body: Тело письма
-        is_html: True для HTML, False для plain text
-    """
     logger.info(
         "Starting email sending",
         operation="send_email_sync",
@@ -75,9 +66,6 @@ def send_email_sync(to_email: str, subject: str, body: str, is_html: bool = True
 
 
 def create_otp_email_template(username: str, otp_code: str) -> str:
-    """
-    Создает HTML шаблон для OTP письма.
-    """
     return f"""
     <html>
     <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -116,9 +104,6 @@ def create_otp_email_template(username: str, otp_code: str) -> str:
 
 
 def create_password_reset_email_template(username: str, otp_code: str) -> str:
-    """
-    Создает HTML шаблон для письма сброса пароля.
-    """
     return f"""
     <html>
     <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -165,9 +150,6 @@ def create_psychologist_credentials_email_template(
     password: str,
     access_until: str = None
 ) -> str:
-    """
-    Создает HTML шаблон для отправки данных доступа психологу.
-    """
     access_info = f"<li>Доступ действителен до: <strong>{access_until}</strong></li>" if access_until else ""
     
     return f"""
