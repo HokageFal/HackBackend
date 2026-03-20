@@ -10,21 +10,11 @@ from contextlib import asynccontextmanager
 import os
 
 from app.routers.user_router import router as user_router
-from app.routers.otp_router import router as otp_router
-from app.routers.password_reset_router import router as password_reset_router
-
-# Импорты для админки
-from sqladmin import Admin
-from sqlalchemy.ext.asyncio import create_async_engine
-from app.core.config import settings
-from app.admin.views import UserAdmin
-from app.admin.auth import AdminAuth
+from app.routers.psychologist_router import router as psychologist_router
+from app.init_admin import init_admin
 import logging
 
 logger = logging.getLogger(__name__)
-
-# Глобальная переменная для хранения экземпляра Admin
-admin_instance = None
 
 
 @asynccontextmanager
@@ -32,10 +22,14 @@ async def lifespan(app: FastAPI):
     logger.info("Запуск приложения...")
 
     try:
-        setup_admin(app)
-        logger.info("Админ-панель инициализирована")
+        # Инициализация администратора
+        logger.info("Начало инициализации администратора...")
+        print("🔥 ПЕРЕД ВЫЗОВОМ init_admin()")
+        await init_admin()
+        print("🔥 ПОСЛЕ ВЫЗОВА init_admin()")
+        logger.info("Инициализация администратора завершена")
     except Exception as e:
-        logger.error(f"Ошибка инициализации админ-панели: {e}")
+        logger.error(f"Ошибка инициализации: {e}", exc_info=True)
 
     yield
 
@@ -43,11 +37,48 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AI Landing Generator API",
+    title="ПрофДНК API",
     version="1.0.0",
-    description="API для генерации лендингов с системой аутентификации и OTP верификации",
-    lifespan=lifespan
+    description="API для платформы психологических тестов ПрофДНК",
+    lifespan=lifespan,
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+    }
 )
+
+# Добавляем схему безопасности для JWT
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title="ПрофДНК API",
+        version="1.0.0",
+        description="API для платформы психологических тестов ПрофДНК",
+        routes=app.routes,
+    )
+    
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Введите JWT токен (без префикса 'Bearer')"
+        }
+    }
+    
+    # Применяем security ко всем эндпоинтам кроме login и health
+    for path in openapi_schema["paths"]:
+        for method in openapi_schema["paths"][path]:
+            if path not in ["/users/login", "/health"] and method != "parameters":
+                openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # CORS должен быть первым
 origins = [
@@ -84,59 +115,7 @@ app.add_middleware(
 
 # API routes
 app.include_router(user_router, tags=["Users"])
-app.include_router(otp_router, tags=["OTP"])
-app.include_router(password_reset_router, tags=["Password Reset"])
-
-
-def setup_admin(app: FastAPI):
-    try:
-        logger.info("Настройка админ-панели...")
-
-        if settings.DATABASE_URL.startswith("postgresql+asyncpg"):
-            admin_engine = create_async_engine(settings.DATABASE_URL, echo=False)
-        elif "postgresql" in settings.DATABASE_URL:
-            # Если URL содержит psycopg2 или другой синхронный драйвер, заменяем на asyncpg
-            admin_engine = create_async_engine(
-                settings.DATABASE_URL.replace("psycopg2", "asyncpg"),
-                echo=False
-            )
-        else:
-            # Или создаем напрямую с asyncpg
-            admin_engine = create_async_engine(
-                f"postgresql+asyncpg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}",
-                echo=False
-            )
-
-        logger.info("Движок админ-панели создан")
-
-        authentication_backend = AdminAuth(secret_key=settings.SECRET_KEY)
-
-        logger.info("Бэкенд аутентификации для админки создан")
-
-        # Инициализируем админку
-        admin = Admin(
-            app=app,
-            engine=admin_engine,
-            title="AI Landing Generator Admin",
-            base_url="/admin",
-            authentication_backend=authentication_backend
-        )
-
-        logger.info("Экземпляр админ-панели создан")
-
-        admin.add_view(UserAdmin)
-
-        global admin_instance
-        admin_instance = admin
-
-        logger.info("Админ-панель настроена и доступна по пути /admin")
-
-        return admin
-    except Exception as e:
-        logger.error(f"Ошибка настройки админ-панели: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        raise
+app.include_router(psychologist_router, tags=["Admin - Psychologists"])
 
 
 @app.exception_handler(RequestValidationError)
@@ -178,8 +157,7 @@ async def health_check():
     return {
         "status": "healthy",
         "version": "1.0.0",
-        "service": "AI Landing Generator API",
-        "admin_available": admin_instance is not None
+        "service": "ПрофДНК API"
     }
 
 

@@ -1,6 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi import Response
 from sqlalchemy.ext.asyncio import AsyncSession
+import os
+import uuid
+from pathlib import Path
 
 from app.database.core import get_db
 from app.core.response_utils import (
@@ -17,7 +20,6 @@ from app.core.response_utils import (
 from app.core.auth_utils import get_user_id_from_token
 from app.core.dependencies import verify_csrf
 from app.docs.responses.user_responses import (
-    USER_REGISTER_RESPONSES,
     USER_LOGIN_RESPONSES,
     REFRESH_TOKEN_RESPONSES,
     ACCESS_TOKEN_RESPONSES,
@@ -26,7 +28,6 @@ from app.docs.responses.user_responses import (
     USER_UPDATE_PROFILE_RESPONSES,
     USER_LOGOUT_RESPONSES,
 )
-from app.schemas.user import UserCreate
 from app.schemas.user_update import UserUpdateProfile
 from app.schemas.user_login import UserLogin
 from app.schemas.api_response import (
@@ -35,7 +36,6 @@ from app.schemas.api_response import (
     UserDataResponse
 )
 from app.services.user import (
-    register_user,
     login_user,
     update_access,
     get_current_user_service,
@@ -43,49 +43,10 @@ from app.services.user import (
     update_user_profile_service,
     UserAlreadyExists,
     InvalidCredentials,
-    UserNotFound,
-    EmailNotVerified
+    UserNotFound
 )
 
 router = APIRouter(prefix="/users")
-
-
-@router.post(
-    "/register",
-    response_model=SuccessResponse,
-    status_code=201,
-    responses=USER_REGISTER_RESPONSES,
-)
-async def register_user_endpoint(user_create: UserCreate, session: AsyncSession = Depends(get_db)):
-    try:
-        user = await register_user(session, user_create)
-        return create_success_response(
-            message="Регистрация прошла успешно",
-            data={
-                "user_id": user.id,
-                "email": user.email,
-                "username": user.username
-            }
-        )
-
-    except UserAlreadyExists as e:
-        raise create_conflict_error(
-            field=e.field,
-            message=e.message,
-            input_data=getattr(user_create, e.field, ""),
-            reason=f"{e.field.title()} already exists"
-        )
-    
-    except EmailNotVerified as e:
-        raise create_forbidden_error(
-            field=e.field,
-            message=e.message,
-            input_data=getattr(user_create, e.field, ""),
-            reason="Email not verified"
-        )
-
-    except Exception:
-        raise create_server_error()
 
 
 @router.post(
@@ -104,15 +65,6 @@ async def login_user_endpoint(user_login: UserLogin,
             message="Вход выполнен успешно",
             access_token=tokens["access_token"],
             user_data=tokens.get("user")
-        )
-    except EmailNotVerified as e:
-        input_value = getattr(user_login, e.field, "")
-        
-        raise create_forbidden_error(
-            field=e.field,
-            message=e.message,
-            input_data=input_value,
-            reason="Email not verified"
         )
     except InvalidCredentials as e:
         input_value = getattr(user_login, e.field, "")
@@ -185,9 +137,14 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
             message="Данные пользователя получены успешно",
             user_data={
                 "id": user.id,
-                "username": user.username,
+                "full_name": user.full_name,
                 "email": user.email,
-                "avatar_url": user.avatar_url,
+                "phone": user.phone,
+                "photo_url": user.photo_url,
+                "about_markdown": user.about_markdown,
+                "role": user.role,
+                "access_until": user.access_until.isoformat() if user.access_until else None,
+                "is_blocked": user.is_blocked,
                 "is_admin": user.is_admin,
                 "created_at": user.created_at.isoformat() if user.created_at else None
             }
@@ -304,7 +261,7 @@ async def update_current_user_profile(
 ):
     try:
         # Проверяем, что хотя бы одно поле указано
-        if user_update.username is None and user_update.avatar_url is None:
+        if user_update.about_markdown is None:
             raise create_business_logic_error(
                 message="Необходимо указать хотя бы одно поле для обновления",
                 field="body",
@@ -319,18 +276,110 @@ async def update_current_user_profile(
         user = await update_user_profile_service(
             session,
             user_id,
-            username=user_update.username,
-            avatar_url=user_update.avatar_url
+            about_markdown=user_update.about_markdown
         )
         
         return create_user_data_response(
             message="Профиль успешно обновлен",
             user_data={
                 "id": user.id,
-                "username": user.username,
+                "full_name": user.full_name,
                 "email": user.email,
-                "avatar_url": user.avatar_url,
-                "is_admin": user.is_admin,
+                "phone": user.phone,
+                "photo_url": user.photo_url,
+                "about_markdown": user.about_markdown,
+                "role": user.role,
+                "access_until": user.access_until.isoformat() if user.access_until else None,
+                "is_blocked": user.is_blocked,
+                "created_at": user.created_at.isoformat() if user.created_at else None
+            }
+        )
+        
+    except UserNotFound as e:
+        raise create_not_found_error(
+            field=e.field,
+            message=e.message,
+            input_data=user_id,
+            reason="User not found in database"
+        )
+        
+    except HTTPException:
+        raise
+        
+    except Exception:
+        raise create_server_error()
+
+
+@router.post(
+    "/me/photo",
+    response_model=UserDataResponse,
+    status_code=200,
+)
+async def upload_user_photo(
+    request: Request,
+    photo: UploadFile = File(...),
+    session: AsyncSession = Depends(get_db)
+):
+    """Загрузка фото психолога"""
+    try:
+        # Проверяем тип файла
+        allowed_types = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
+        if photo.content_type not in allowed_types:
+            raise create_business_logic_error(
+                message="Недопустимый формат файла. Разрешены: JPEG, PNG, WEBP",
+                field="photo",
+                input_data=photo.content_type,
+                reason="Invalid file type"
+            )
+        
+        # Проверяем размер файла (макс 5MB)
+        content = await photo.read()
+        if len(content) > 5 * 1024 * 1024:
+            raise create_business_logic_error(
+                message="Размер файла не должен превышать 5MB",
+                field="photo",
+                input_data=f"{len(content)} bytes",
+                reason="File too large"
+            )
+        
+        # Получаем ID пользователя
+        user_id = get_user_id_from_token(request)
+        
+        # Создаем папку для фото если её нет
+        upload_dir = Path("static/uploads/photos")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Генерируем уникальное имя файла
+        file_ext = photo.filename.split(".")[-1]
+        filename = f"{user_id}_{uuid.uuid4().hex}.{file_ext}"
+        file_path = upload_dir / filename
+        
+        # Сохраняем файл
+        with open(file_path, "wb") as f:
+            f.write(content)
+        
+        # Формируем URL
+        photo_url = f"/static/uploads/photos/{filename}"
+        
+        # Обновляем профиль
+        user = await update_user_profile_service(
+            session,
+            user_id,
+            photo_url=photo_url
+        )
+        
+        return create_user_data_response(
+            message="Фото успешно загружено",
+            user_data={
+                "id": user.id,
+                "full_name": user.full_name,
+                "email": user.email,
+                "phone": user.phone,
+                "photo_url": user.photo_url,
+                "about_markdown": user.about_markdown,
+                "role": user.role,
+                "access_until": user.access_until.isoformat() if user.access_until else None,
+                "is_blocked": user.is_blocked,
                 "created_at": user.created_at.isoformat() if user.created_at else None
             }
         )

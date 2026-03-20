@@ -6,30 +6,16 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class UserUpdateProfile(BaseModel):
-    """Схема для обновления профиля пользователя."""
+    """Схема для обновления профиля психолога."""
     
-    username: str | None = Field(
+    about_markdown: str | None = Field(
         None,
-        min_length=3,
-        max_length=50,
-        description="Новое имя пользователя"
-    )
-    avatar_url: str | None = Field(
-        None,
-        max_length=500,
-        description="Новый URL аватара"
+        description="Описание психолога в формате Markdown"
     )
     
-    @field_validator('username')
+    @field_validator('about_markdown')
     @classmethod
-    def username_not_empty(cls, v: str | None) -> str | None:
+    def about_markdown_not_empty(cls, v: str | None) -> str | None:
         if v is not None and v.strip() == "":
-            raise ValueError("Имя пользователя не может быть пустым")
-        return v
-    
-    @field_validator('avatar_url')
-    @classmethod
-    def avatar_url_not_empty(cls, v: str | None) -> str | None:
-        if v is not None and v.strip() == "":
-            raise ValueError("URL аватара не может быть пустым")
+            raise ValueError("Описание не может быть пустым")
         return v

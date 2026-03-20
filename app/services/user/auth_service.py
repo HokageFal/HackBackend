@@ -16,7 +16,7 @@ from app.core.csrf_utils import generate_csrf_token, CSRF_COOKIE_NAME
 from app.database.crud.user_crud import get_user_by_email
 from app.database.models.users import User
 from app.schemas.user_login import UserLogin
-from app.services.user.exceptions import InvalidCredentials, EmailNotVerified
+from app.services.user.exceptions import InvalidCredentials
 
 load_dotenv()
 logger = get_logger(__name__)
@@ -84,17 +84,6 @@ async def login_user(session: AsyncSession, user_login: UserLogin, response: Res
             )
             raise InvalidCredentials("password", "Неверный пароль")
 
-        # Проверяем подтверждение email
-        if not user.email_verified:
-            logger.warning(
-                "Login failed - email not verified",
-                operation="login_user",
-                user_id=user.id,
-                email=user.email,
-                reason="email_not_verified"
-            )
-            raise EmailNotVerified("email", "Email не подтвержден. Проверьте почту и подтвердите регистрацию")
-
         # Генерируем токены
         access_token, refresh_token = generate_auth_tokens(user)
         
@@ -124,21 +113,23 @@ async def login_user(session: AsyncSession, user_login: UserLogin, response: Res
             operation="login_user",
             user_id=user.id,
             email=user.email,
-            username=user.username
+            full_name=user.full_name
         )
 
         return {
             "access_token": access_token,
             "user": {
                 "id": user.id,
-                "username": user.username,
+                "full_name": user.full_name,
                 "email": user.email,
-                "avatar_url": user.avatar_url,
+                "phone": user.phone,
+                "photo_url": user.photo_url,
+                "role": user.role,
                 "is_admin": user.is_admin
             }
         }
         
-    except (InvalidCredentials, EmailNotVerified):
+    except InvalidCredentials:
         raise
     except Exception as e:
         logger.error(
