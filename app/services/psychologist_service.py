@@ -1,19 +1,18 @@
-﻿"""
-Psychologist service.
-Handles psychologist creation and management by admin.
-"""
-
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import date
 
 from app.core.logging_config import get_logger
 from app.core.security import hash_password
 from app.core.email_utils import send_email_sync, create_psychologist_credentials_email_template
-from app.database.crud.user_crud import get_user_by_email
-from app.database.crud.psychologist_crud import create_psychologist
-from app.schemas.psychologist import PsychologistCreate
+from app.database.crud.psychologist_crud import (
+    create_psychologist,
+    get_all_psychologists,
+    get_psychologist_by_id,
+    update_psychologist
+)
+from app.database.crud.user_crud import check_email_exists
 from app.database.models.users import User
-from app.services.user.exceptions import UserAlreadyExists
+from app.schemas.psychologist import PsychologistCreate
+from app.services.user.exceptions import UserAlreadyExists, UserNotFound
 
 logger = get_logger(__name__)
 
@@ -22,19 +21,6 @@ async def create_psychologist_service(
     session: AsyncSession,
     psychologist_data: PsychologistCreate
 ) -> User:
-    """
-    Создает нового психолога (только для админа).
-    
-    Args:
-        session: Сессия базы данных
-        psychologist_data: анные для создания психолога
-        
-    Returns:
-        Созданный объект психолога
-        
-    Raises:
-        UserAlreadyExists: ользователь с таким email уже существует
-    """
     logger.info(
         "Starting psychologist creation",
         operation="create_psychologist_service",
@@ -43,28 +29,25 @@ async def create_psychologist_service(
     )
     
     try:
-        # роверяем существование пользователя по email
-        existing_user = await get_user_by_email(session, psychologist_data.email)
+        email_exists = await check_email_exists(session, psychologist_data.email)
         
-        if existing_user:
+        if email_exists:
             logger.warning(
                 "Psychologist creation failed - email already exists",
                 operation="create_psychologist_service",
                 email=psychologist_data.email,
                 reason="email_already_exists"
             )
-            raise UserAlreadyExists("email", "ользователь с таким email уже существует")
+            raise UserAlreadyExists("email", f"Пользователь с email {psychologist_data.email} уже существует")
         
-        # Хешируем пароль
-        hashed_password = hash_password(psychologist_data.password)
+        password_hash = hash_password(psychologist_data.password)
         
-        # Создаем психолога
         psychologist = await create_psychologist(
             session=session,
             full_name=psychologist_data.full_name,
             email=psychologist_data.email,
             phone=psychologist_data.phone,
-            password_hash=hashed_password,
+            password_hash=password_hash,
             access_until=psychologist_data.access_until
         )
         
@@ -72,22 +55,11 @@ async def create_psychologist_service(
             "Psychologist created successfully",
             operation="create_psychologist_service",
             psychologist_id=psychologist.id,
-            email=psychologist.email,
-            full_name=psychologist.full_name,
-            access_until=psychologist.access_until.isoformat() if psychologist.access_until else None
+            email=psychologist.email
         )
         
-        # тправляем email с данными доступа, если требуется
         if psychologist_data.send_email:
             try:
-                logger.info(
-                    " Т EMAIL",
-                    operation="create_psychologist_service",
-                    psychologist_id=psychologist.id,
-                    email=psychologist.email,
-                    send_email_flag=psychologist_data.send_email
-                )
-                
                 email_body = create_psychologist_credentials_email_template(
                     full_name=psychologist_data.full_name,
                     email=psychologist_data.email,
@@ -95,42 +67,29 @@ async def create_psychologist_service(
                     access_until=psychologist_data.access_until.isoformat() if psychologist_data.access_until else None
                 )
                 
-                logger.info(
-                    "EMAIL Ш С, ТЯ...",
-                    operation="create_psychologist_service",
-                    to_email=psychologist_data.email
-                )
-                
                 send_email_sync(
                     to_email=psychologist_data.email,
-                    subject="обро пожаловать в роф - анные для входа",
+                    subject="Добро пожаловать в ПрофДНК - Данные для входа",
                     body=email_body,
                     is_html=True
                 )
                 
                 logger.info(
-                    "EMAIL СШ Т!",
+                    "Credentials email sent successfully",
                     operation="create_psychologist_service",
                     psychologist_id=psychologist.id,
                     email=psychologist.email
                 )
-            except Exception as email_error:
+            except Exception as e:
                 logger.error(
-                    "Ш Т EMAIL",
+                    "Failed to send credentials email",
                     operation="create_psychologist_service",
                     psychologist_id=psychologist.id,
                     email=psychologist.email,
-                    error_type=type(email_error).__name__,
-                    error_message=str(email_error),
+                    error_type=type(e).__name__,
+                    error_message=str(e),
                     exc_info=True
                 )
-        else:
-            logger.info(
-                "Т EMAIL Щ (send_email=False)",
-                operation="create_psychologist_service",
-                psychologist_id=psychologist.id,
-                send_email_flag=psychologist_data.send_email
-            )
         
         return psychologist
         
@@ -141,6 +100,136 @@ async def create_psychologist_service(
             "Unexpected error during psychologist creation",
             operation="create_psychologist_service",
             email=psychologist_data.email,
+            error_type=type(e).__name__,
+            error_message=str(e),
+            exc_info=True
+        )
+        raise
+
+
+async def get_psychologist_by_id_service(
+    session: AsyncSession,
+    psychologist_id: int
+) -> User:
+    logger.info(
+        "Starting psychologist retrieval",
+        operation="get_psychologist_by_id_service",
+        psychologist_id=psychologist_id
+    )
+    
+    try:
+        psychologist = await get_psychologist_by_id(session, psychologist_id)
+        
+        if not psychologist:
+            logger.warning(
+                "Psychologist not found",
+                operation="get_psychologist_by_id_service",
+                psychologist_id=psychologist_id,
+                reason="psychologist_not_found"
+            )
+            raise UserNotFound("psychologist_id", f"Психолог с ID {psychologist_id} не найден")
+        
+        logger.info(
+            "Psychologist retrieved successfully",
+            operation="get_psychologist_by_id_service",
+            psychologist_id=psychologist.id,
+            email=psychologist.email
+        )
+        
+        return psychologist
+        
+    except UserNotFound:
+        raise
+    except Exception as e:
+        logger.error(
+            "Unexpected error during psychologist retrieval",
+            operation="get_psychologist_by_id_service",
+            psychologist_id=psychologist_id,
+            error_type=type(e).__name__,
+            error_message=str(e),
+            exc_info=True
+        )
+        raise
+
+
+async def get_all_psychologists_service(session: AsyncSession) -> list[User]:
+    logger.info(
+        "Starting psychologists list retrieval",
+        operation="get_all_psychologists_service"
+    )
+    
+    try:
+        psychologists = await get_all_psychologists(session)
+        
+        logger.info(
+            "Psychologists list retrieved successfully",
+            operation="get_all_psychologists_service",
+            count=len(psychologists)
+        )
+        
+        return psychologists
+        
+    except Exception as e:
+        logger.error(
+            "Unexpected error during psychologists list retrieval",
+            operation="get_all_psychologists_service",
+            error_type=type(e).__name__,
+            error_message=str(e),
+            exc_info=True
+        )
+        raise
+
+
+
+async def update_psychologist_service(
+    session: AsyncSession,
+    psychologist_id: int,
+    update_data: dict
+) -> User:
+    logger.info(
+        "Starting psychologist update",
+        operation="update_psychologist_service",
+        psychologist_id=psychologist_id,
+        fields=list(update_data.keys())
+    )
+    
+    try:
+        psychologist = await get_psychologist_by_id(session, psychologist_id)
+        
+        if not psychologist:
+            logger.warning(
+                "Psychologist update failed - not found",
+                operation="update_psychologist_service",
+                psychologist_id=psychologist_id,
+                reason="psychologist_not_found"
+            )
+            raise UserNotFound("psychologist_id", f"Психолог с ID {psychologist_id} не найден")
+        
+        updated_psychologist = await update_psychologist(
+            session=session,
+            psychologist_id=psychologist_id,
+            full_name=update_data.get("full_name"),
+            phone=update_data.get("phone"),
+            access_until=update_data.get("access_until"),
+            is_blocked=update_data.get("is_blocked")
+        )
+        
+        logger.info(
+            "Psychologist updated successfully",
+            operation="update_psychologist_service",
+            psychologist_id=psychologist_id,
+            updated_fields=list(update_data.keys())
+        )
+        
+        return updated_psychologist
+        
+    except (UserNotFound, UserAlreadyExists):
+        raise
+    except Exception as e:
+        logger.error(
+            "Unexpected error during psychologist update",
+            operation="update_psychologist_service",
+            psychologist_id=psychologist_id,
             error_type=type(e).__name__,
             error_message=str(e),
             exc_info=True

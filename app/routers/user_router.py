@@ -320,7 +320,6 @@ async def upload_user_photo(
     photo: UploadFile = File(...),
     session: AsyncSession = Depends(get_db)
 ):
-    """Загрузка фото психолога"""
     try:
         # Проверяем тип файла
         allowed_types = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
