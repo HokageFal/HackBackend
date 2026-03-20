@@ -9,7 +9,6 @@ from app.core.logging_config import get_logger
 from app.database.crud.user_crud import get_user_by_email, get_user_by_id, delete_user_by_id
 from app.database.models.users import User
 from app.services.user.exceptions import UserNotFound
-from app.database.crud.user_crud import update_user_profile
 
 logger = get_logger(__name__)
 
@@ -50,7 +49,7 @@ async def get_current_user_service(session: AsyncSession, user_id: int) -> User:
             "Current user retrieved successfully",
             operation="get_current_user_service",
             user_id=user.id,
-            username=user.username,
+            full_name=user.full_name,
             email=user.email
         )
         
@@ -107,7 +106,7 @@ async def delete_user_service(session: AsyncSession, user_id: int) -> bool:
             operation="delete_user_service",
             user_id=user_id,
             email=user.email,
-            username=user.username
+            full_name=user.full_name
         )
         
         return True
@@ -126,82 +125,20 @@ async def delete_user_service(session: AsyncSession, user_id: int) -> bool:
         raise
 
 
-async def activate_user_by_email(session: AsyncSession, email: str) -> User:
-    """
-    Активирует пользователя после подтверждения OTP кода.
-    
-    Args:
-        session: Сессия базы данных
-        email: Email пользователя
-        
-    Returns:
-        Обновленный объект пользователя
-        
-    Raises:
-        UserNotFound: Пользователь не найден
-    """
-    logger.info(
-        "Starting user activation",
-        operation="activate_user_by_email",
-        email=email
-    )
-    
-    try:
-        user = await get_user_by_email(session, email)
-        
-        if user is None:
-            logger.warning(
-                "User activation failed - user not found",
-                operation="activate_user_by_email",
-                email=email,
-                reason="user_not_found"
-            )
-            raise UserNotFound("email", f"Пользователь с email {email} не найден")
-        
-        # Активируем пользователя
-        user.email_verified = True
-        await session.commit()
-        await session.refresh(user)
-        
-        logger.info(
-            "User activated successfully",
-            operation="activate_user_by_email",
-            user_id=user.id,
-            email=user.email,
-            username=user.username
-        )
-        
-        return user
-        
-    except UserNotFound:
-        raise
-    except Exception as e:
-        logger.error(
-            "Unexpected error during user activation",
-            operation="activate_user_by_email",
-            email=email,
-            error_type=type(e).__name__,
-            error_message=str(e),
-            exc_info=True
-        )
-        raise
-
-
-
 async def update_user_profile_service(
     session: AsyncSession,
     user_id: int,
-    username: str | None = None,
-    avatar_url: str | None = None
+    about_markdown: str | None = None,
+    photo_url: str | None = None
 ) -> User:
     """
-    Обновляет профиль пользователя.
+    Обновляет профиль психолога.
     
     Args:
         session: Сессия базы данных
         user_id: ID пользователя
-        username: Новое имя пользователя (опционально)
-        avatar_url: Новый URL аватара (опционально)
+        about_markdown: Описание в Markdown (опционально)
+        photo_url: URL фото (опционально)
         
     Returns:
         Обновленный объект пользователя
@@ -216,8 +153,7 @@ async def update_user_profile_service(
     )
     
     try:
-
-        user = await update_user_profile(session, user_id, username, avatar_url)
+        user = await get_user_by_id(session, user_id)
         
         if user is None:
             logger.warning(
@@ -226,6 +162,15 @@ async def update_user_profile_service(
                 user_id=user_id
             )
             raise UserNotFound("id", f"Пользователь с ID {user_id} не найден")
+        
+        # Обновляем поля
+        if about_markdown is not None:
+            user.about_markdown = about_markdown
+        if photo_url is not None:
+            user.photo_url = photo_url
+            
+        await session.commit()
+        await session.refresh(user)
         
         logger.info(
             "User profile updated successfully",

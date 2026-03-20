@@ -18,13 +18,16 @@ class RefreshTokenResponse(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
-    username: str
+    full_name: str
     email: str
-    avatar_url: Optional[str] = None
+    phone: str
+    photo_url: Optional[str] = None
+    about_markdown: Optional[str] = None
+    role: str
     is_admin: bool
-    email_verified: bool
+    access_until: Optional[datetime] = None
+    is_blocked: bool
     created_at: datetime
-    updated_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True

@@ -10,9 +10,7 @@ celery_app = Celery(
     "ai_landing_generator",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=[
-        "app.tasks.email_tasks",
-    ]
+    include=[]
 )
 
 celery_app.conf.update(
@@ -37,8 +35,6 @@ celery_app.conf.update(
     task_default_retry_delay=60,  # 1 минута
     task_max_retries=3,
 )
-
-celery_app.autodiscover_tasks(["app.tasks"])
 
 celery_app.conf.beat_schedule = {}
 
