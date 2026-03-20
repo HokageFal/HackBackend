@@ -30,8 +30,8 @@ class UserNotFound(Exception):
         super().__init__(message)
 
 
-class EmailNotVerified(Exception):
-    """Raised when user's email is not verified."""
+class InvalidOperation(Exception):
+    """Raised when operation is not allowed for this user type."""
     
     def __init__(self, field: str, message: str):
         self.field = field
@@ -39,8 +39,8 @@ class EmailNotVerified(Exception):
         super().__init__(message)
 
 
-class InvalidOperation(Exception):
-    """Raised when operation is not allowed for this user type."""
+class AccessDenied(Exception):
+    """Raised when user access is blocked or expired."""
     
     def __init__(self, field: str, message: str):
         self.field = field
