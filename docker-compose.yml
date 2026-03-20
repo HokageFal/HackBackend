@@ -9,7 +9,8 @@ x-app-common: &app-common
   build: .
   restart: unless-stopped
   user: "1000:1000"
-  read_only: true
+  volumes:
+    - .:/code
   tmpfs:
     - /tmp
   cap_drop:
