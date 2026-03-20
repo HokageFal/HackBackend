@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
-from contextlib import asynccontextmanager
 import os
 
 from app.routers.user_router import router as user_router
@@ -17,34 +16,31 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("Запуск приложения...")
-
-    try:
-        # Инициализация администратора
-        logger.info("Начало инициализации администратора...")
-        print("🔥 ПЕРЕД ВЫЗОВОМ init_admin()")
-        await init_admin()
-        print("🔥 ПОСЛЕ ВЫЗОВА init_admin()")
-        logger.info("Инициализация администратора завершена")
-    except Exception as e:
-        logger.error(f"Ошибка инициализации: {e}", exc_info=True)
-
-    yield
-
-    logger.info("Остановка приложения...")
-
-
 app = FastAPI(
     title="ПрофДНК API",
     version="1.0.0",
     description="API для платформы психологических тестов ПрофДНК",
-    lifespan=lifespan,
     swagger_ui_parameters={
         "persistAuthorization": True,
     }
 )
+
+
+@app.on_event("startup")
+def startup_event():
+    """Выполняется при запуске приложения."""
+    logger.info("Запуск приложения...")
+    try:
+        init_admin()
+    except Exception as e:
+        logger.error(f"Ошибка инициализации админа: {e}", exc_info=True)
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    """Выполняется при остановке приложения."""
+    logger.info("Остановка приложения...")
+
 
 # Добавляем схему безопасности для JWT
 from fastapi.openapi.utils import get_openapi
