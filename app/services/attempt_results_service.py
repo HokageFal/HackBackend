@@ -295,13 +295,19 @@ async def generate_report_service(
         template = next((t for t in templates if t.audience.value == audience), None)
         
         if not template:
-            logger.warning(
-                "Report template not found",
+            logger.info(
+                "Report template not found, using default",
                 operation="generate_report_service",
                 attempt_id=attempt_id,
                 audience=audience
             )
-            raise AttemptNotFound("audience", f"Шаблон отчета для аудитории '{audience}' не найден")
+            # Используем дефолтный шаблон если не настроен
+            template_definition = {
+                "title": f"Отчет - {audience}",
+                "sections": ["profile", "answers", "metrics"]
+            }
+        else:
+            template_definition = template.template_definition
         
         report_html = f"""
         <!DOCTYPE html>
