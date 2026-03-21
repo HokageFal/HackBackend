@@ -34,7 +34,7 @@ async def delete_user_by_id(session: AsyncSession, user_id: int) -> bool:
         return False
     
     await session.delete(user)
-    await session.commit()
+    await session.flush()
     return True
 
 
@@ -49,9 +49,7 @@ async def update_user_password(
     if user is None:
         return False
 
-
-
     user.password = new_password_hash
-    await session.commit()
+    await session.flush()
     return True
 

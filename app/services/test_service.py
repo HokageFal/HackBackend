@@ -380,6 +380,8 @@ async def update_test_service(
             client_can_view_report=test_data.client_can_view_report
         )
         
+        await session.commit()
+        
         logger.info(
             "Test updated successfully",
             operation="update_test_service",
@@ -437,6 +439,8 @@ async def delete_test_service(
             raise TestAccessDenied("test_id", "У вас нет доступа к этому тесту")
         
         deleted = await delete_test(session, test_id)
+        
+        await session.commit()
         
         logger.info(
             "Test deleted successfully",
@@ -689,6 +693,8 @@ async def import_test_service(
                 audience=ReportAudience(t_data.get("audience")),
                 template_definition=t_data.get("template_definition", {})
             )
+        
+        await session.commit()
         
         logger.info(
             "Test imported successfully",
