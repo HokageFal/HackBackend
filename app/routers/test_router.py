@@ -755,8 +755,8 @@ async def get_test_link_endpoint(
         
         result = await get_test_by_id_service(session, test_id, psychologist.id)
         
-        base_url = os.getenv("BASE_URL", "http://localhost:8000")
-        public_link = f"{base_url}/public/tests/{result['public_link_token']}"
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        public_link = f"{frontend_url}/test/{result['public_link_token']}"
         
         return create_success_response(
             message="Публичная ссылка получена",
@@ -938,6 +938,154 @@ async def import_test_endpoint(
         logger.error(
             "Unexpected error in import test endpoint",
             operation="import_test_endpoint",
+            error_type=type(e).__name__,
+            error_message=str(e),
+            exc_info=True
+        )
+        raise create_server_error()
+
+
+
+@router.get(
+    "/{test_id}/attempts",
+    response_model=SuccessResponse,
+    summary="Получить список прохождений теста",
+    description="""
+    Возвращает список всех прохождений (attempts) конкретного теста.
+    
+    **Доступ:**
+    - Только психолог-владелец теста
+    
+    **Возвращает:**
+    - Список прохождений с базовой информацией
+    - ID попытки
+    - Имя клиента
+    - Дата начала и завершения
+    - Статус (completed/in_progress)
+    - Пагинация
+    
+    **Использование:**
+    - Экран "Результаты теста"
+    - Таблица всех клиентов кто прошел тест
+    - Для каждой строки можно открыть детальный просмотр
+    """,
+    responses={
+        200: {
+            "description": "Список прохождений получен",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Список прохождений получен",
+                        "data": {
+                            "test_id": 1,
+                            "test_title": "Тест на профориентацию",
+                            "attempts": [
+                                {
+                                    "id": 123,
+                                    "client_name": "Иванов Иван Иванович",
+                                    "started_at": "2026-03-21T10:00:00",
+                                    "submitted_at": "2026-03-21T10:45:00",
+                                    "status": "completed"
+                                },
+                                {
+                                    "id": 124,
+                                    "client_name": "Петров Петр Петрович",
+                                    "started_at": "2026-03-21T11:00:00",
+                                    "submitted_at": None,
+                                    "status": "in_progress"
+                                }
+                            ],
+                            "pagination": {
+                                "total": 45,
+                                "page": 1,
+                                "limit": 20,
+                                "total_pages": 3,
+                                "has_next": True,
+                                "has_prev": False
+                            }
+                        },
+                        "errors": None
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Нет доступа к тесту"
+        },
+        404: {
+            "description": "Тест не найден"
+        }
+    }
+)
+async def get_test_attempts_endpoint(
+    test_id: int,
+    skip: int = 0,
+    limit: int = 20,
+    request: Request = None,
+    session: AsyncSession = Depends(get_db)
+):
+    from app.services.attempt_results_service import (
+        get_test_attempts_service,
+        TestNotFound,
+        AccessDenied
+    )
+    
+    logger.info(
+        "Get test attempts endpoint called",
+        operation="get_test_attempts_endpoint",
+        test_id=test_id,
+        skip=skip,
+        limit=limit
+    )
+    
+    try:
+        psychologist = await get_current_psychologist(request, session)
+        
+        result = await get_test_attempts_service(
+            session,
+            test_id,
+            psychologist.id,
+            skip,
+            limit
+        )
+        
+        logger.info(
+            "Test attempts retrieved successfully in endpoint",
+            operation="get_test_attempts_endpoint",
+            test_id=test_id,
+            count=len(result["attempts"])
+        )
+        
+        return create_success_response(
+            message="Список прохождений получен",
+            data=result
+        )
+    
+    except AccessDeniedError as e:
+        raise create_forbidden_error(
+            field=e.field,
+            message=e.message,
+            input_data="",
+            reason="Access denied"
+        )
+    
+    except (TestNotFound, AccessDenied) as e:
+        raise create_not_found_error(
+            field=e.field,
+            message=e.message,
+            input_data=str(test_id),
+            reason="Test not found or access denied"
+        )
+    
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise
+        
+        logger.error(
+            "Unexpected error in get test attempts endpoint",
+            operation="get_test_attempts_endpoint",
+            test_id=test_id,
             error_type=type(e).__name__,
             error_message=str(e),
             exc_info=True

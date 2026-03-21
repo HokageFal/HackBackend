@@ -29,3 +29,15 @@ async def get_selected_options(
     )
     return list(result.scalars().all())
 
+
+
+
+async def get_options_by_answer(
+    session: AsyncSession,
+    user_answer_id: int
+) -> list[UserAnswerOption]:
+    result = await session.execute(
+        select(UserAnswerOption)
+        .where(UserAnswerOption.user_answer_id == user_answer_id)
+    )
+    return list(result.scalars().all())

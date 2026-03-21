@@ -401,3 +401,61 @@ async def upload_user_photo(
         
     except Exception:
         raise create_server_error()
+
+
+
+@router.get(
+    "/me/status",
+    response_model=SuccessResponse,
+    status_code=200,
+    summary="Проверить статус аккаунта",
+    description="""
+    Легковесный эндпоинт для проверки статуса аккаунта.
+    
+    Фронтенд должен вызывать этот эндпоинт каждые 30-60 секунд
+    чтобы проверить не заблокирован ли пользователь и не истек ли срок доступа.
+    
+    Если аккаунт заблокирован или срок истек - вернет 403 ошибку.
+    """
+)
+async def check_user_status(
+    request: Request,
+    session: AsyncSession = Depends(get_db)
+):
+    try:
+        from app.core.dependencies import get_current_active_user, AccessDeniedError
+        
+        user = await get_current_active_user(request, session)
+        
+        # Для психологов проверяем срок доступа
+        if user.role == UserRoleEnum.psychologist and user.access_until:
+            from app.core.timezone_utils import get_current_msk_time
+            now = get_current_msk_time()
+            if user.access_until < now:
+                raise AccessDeniedError(
+                    field="access_until",
+                    message=f"Срок доступа истек {user.access_until.strftime('%d.%m.%Y')}. Обратитесь к администратору"
+                )
+        
+        return create_success_response(
+            message="Статус аккаунта в порядке",
+            data={
+                "is_blocked": user.is_blocked,
+                "access_until": user.access_until.isoformat() if user.access_until else None,
+                "is_active": True
+            }
+        )
+    
+    except AccessDeniedError as e:
+        raise create_forbidden_error(
+            field=e.field,
+            message=e.message,
+            input_data="",
+            reason="Access denied"
+        )
+    
+    except HTTPException:
+        raise
+    
+    except Exception:
+        raise create_server_error()
