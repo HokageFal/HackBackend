@@ -82,6 +82,30 @@ async def login_user(session: AsyncSession, user_login: UserLogin, response: Res
                 reason="invalid_password"
             )
             raise InvalidCredentials("password", "Неверный пароль")
+        
+        # Проверяем блокировку (только для не-админов)
+        if not user.is_admin and user.is_blocked:
+            logger.warning(
+                "Login failed - user is blocked",
+                operation="login_user",
+                user_id=user.id,
+                email=user.email,
+                reason="user_blocked"
+            )
+            raise InvalidCredentials("email", "Ваш аккаунт заблокирован. Обратитесь к администратору")
+        
+        # Проверяем срок доступа (только для не-админов)
+        if not user.is_admin and user.access_until:
+            if user.access_until < datetime.utcnow():
+                logger.warning(
+                    "Login failed - access expired",
+                    operation="login_user",
+                    user_id=user.id,
+                    email=user.email,
+                    access_until=user.access_until.isoformat(),
+                    reason="access_expired"
+                )
+                raise InvalidCredentials("email", f"Срок доступа к системе истек {user.access_until.strftime('%d.%m.%Y')}. Обратитесь к администратору")
 
         # Генерируем токены
         access_token, refresh_token = generate_auth_tokens(user)

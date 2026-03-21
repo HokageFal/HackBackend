@@ -84,8 +84,7 @@ async def login_user_endpoint(user_login: UserLogin,
     "/refresh",
     response_model=AuthSuccessResponse,
     status_code=200,
-    responses=REFRESH_TOKEN_RESPONSES,
-    dependencies=[Depends(verify_csrf)]  # CSRF защита
+    responses=REFRESH_TOKEN_RESPONSES
 )
 async def refresh_access_token(request: Request, response: Response):
     try:
