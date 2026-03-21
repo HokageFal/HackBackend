@@ -52,15 +52,42 @@ router = APIRouter(prefix="/tests", tags=["Tests"])
     - Варианты ответов (`options`) вкладываются прямо в вопрос
     
     **Типы вопросов:**
-    - `text` - текстовый ответ
-    - `textarea` - многострочный текст
-    - `single_choice` - один из списка
-    - `multiple_choice` - множественный выбор
-    - `boolean` - да/нет
-    - `number` - числовой ответ
-    - `slider` - диапазон
-    - `datetime` - выбор даты/времени
-    - `rating_scale` - шкала оценки
+    
+    1. **text** - Короткий текстовый ответ (одна строка)
+       - Для имени, города, профессии и т.д.
+       - Не требует options
+       
+    2. **textarea** - Многострочный текстовый ответ
+       - Для развернутых ответов, эссе, описаний
+       - Не требует options
+       
+    3. **single_choice** - Выбор одного варианта из списка (радиокнопки)
+       - Требует options с вариантами ответов
+       - Клиент выбирает только один вариант
+       
+    4. **multiple_choice** - Выбор нескольких вариантов (чекбоксы)
+       - Требует options с вариантами ответов
+       - Клиент может выбрать несколько вариантов
+       
+    5. **boolean** - Да/Нет вопрос
+       - Простой выбор между двумя вариантами
+       - Не требует options (автоматически Да/Нет)
+       
+    6. **number** - Числовой ответ
+       - Для возраста, количества, процентов и т.д.
+       - Можно указать min/max в settings
+       
+    7. **slider** - Ползунок с диапазоном значений
+       - Для оценки по шкале
+       - Требует settings: {"min": 0, "max": 100, "step": 1}
+       
+    8. **datetime** - Выбор даты и/или времени
+       - Для даты рождения, времени события и т.д.
+       - Можно указать формат в settings
+       
+    9. **rating_scale** - Шкала оценки (звездочки, баллы)
+       - Для оценки от 1 до N
+       - Требует settings: {"min": 1, "max": 10}
     """,
     responses={
         201: {
@@ -168,25 +195,95 @@ async def create_test_endpoint(
             {
                 "temp_id": "q1",
                 "section_id": "section1",
-                "question_text": "Как вы оцениваете свою коммуникабельность?",
-                "question_type": "rating_scale",
+                "question_text": "Введите ваше имя",
+                "question_type": "text",
                 "is_required": True,
                 "display_order": 1,
-                "settings": {"min": 1, "max": 10},
                 "options": []
             },
             {
                 "temp_id": "q2",
                 "section_id": "section1",
-                "question_text": "Вы предпочитаете работать в команде?",
+                "question_text": "Расскажите о своих целях",
+                "question_type": "textarea",
+                "is_required": False,
+                "display_order": 2,
+                "options": []
+            },
+            {
+                "temp_id": "q3",
+                "section_id": "section1",
+                "question_text": "Выберите ваш уровень образования",
                 "question_type": "single_choice",
                 "is_required": True,
-                "display_order": 2,
+                "display_order": 3,
                 "options": [
-                    {"option_text": "Да", "option_value": 1, "display_order": 1},
-                    {"option_text": "Нет", "option_value": 0, "display_order": 2},
-                    {"option_text": "Иногда", "option_value": 2, "display_order": 3}
+                    {"option_text": "Среднее", "option_value": 1, "display_order": 1},
+                    {"option_text": "Высшее", "option_value": 2, "display_order": 2},
+                    {"option_text": "Магистратура", "option_value": 3, "display_order": 3}
                 ]
+            },
+            {
+                "temp_id": "q4",
+                "section_id": "section1",
+                "question_text": "Какие навыки у вас есть? (можно выбрать несколько)",
+                "question_type": "multiple_choice",
+                "is_required": False,
+                "display_order": 4,
+                "options": [
+                    {"option_text": "Коммуникация", "option_value": 1, "display_order": 1},
+                    {"option_text": "Лидерство", "option_value": 2, "display_order": 2},
+                    {"option_text": "Аналитика", "option_value": 3, "display_order": 3},
+                    {"option_text": "Креативность", "option_value": 4, "display_order": 4}
+                ]
+            },
+            {
+                "temp_id": "q5",
+                "section_id": "section1",
+                "question_text": "Вы готовы к переезду?",
+                "question_type": "boolean",
+                "is_required": True,
+                "display_order": 5,
+                "options": []
+            },
+            {
+                "temp_id": "q6",
+                "section_id": "section1",
+                "question_text": "Сколько вам лет?",
+                "question_type": "number",
+                "is_required": True,
+                "display_order": 6,
+                "settings": {"min": 14, "max": 100},
+                "options": []
+            },
+            {
+                "temp_id": "q7",
+                "section_id": "section1",
+                "question_text": "Оцените вашу мотивацию к обучению",
+                "question_type": "slider",
+                "is_required": True,
+                "display_order": 7,
+                "settings": {"min": 0, "max": 100, "step": 10},
+                "options": []
+            },
+            {
+                "temp_id": "q8",
+                "section_id": "section1",
+                "question_text": "Когда вы планируете начать работу?",
+                "question_type": "datetime",
+                "is_required": False,
+                "display_order": 8,
+                "options": []
+            },
+            {
+                "temp_id": "q9",
+                "section_id": "section1",
+                "question_text": "Оцените свою коммуникабельность",
+                "question_type": "rating_scale",
+                "is_required": True,
+                "display_order": 9,
+                "settings": {"min": 1, "max": 10},
+                "options": []
             }
         ],
         "profile_fields": [
