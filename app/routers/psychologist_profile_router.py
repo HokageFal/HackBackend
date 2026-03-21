@@ -249,3 +249,100 @@ async def delete_my_photo(
             exc_info=True
         )
         raise create_server_error()
+
+
+
+@router.get(
+    "/me/card",
+    response_model=SuccessResponse,
+    summary="Получить информацию о своей визитке",
+    description="""
+    Возвращает информацию о визитке психолога и ссылки для QR кода.
+    
+    **Возвращает:**
+    - URL публичной визитки
+    - URL для скачивания QR кода
+    - Превью данных визитки
+    
+    **Использование:**
+    - Психолог может посмотреть как выглядит его визитка
+    - Получить QR код для печати
+    - Поделиться ссылкой с клиентами
+    """
+)
+async def get_my_card_info(
+    request: Request,
+    session: AsyncSession = Depends(get_db)
+):
+    from app.core.config import settings
+    
+    logger.info(
+        "Get my card info endpoint called",
+        operation="get_my_card_info"
+    )
+    
+    try:
+        psychologist = await get_current_psychologist(request, session)
+        
+        frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+        base_url = settings.BASE_URL or "http://localhost:8000"
+        
+        card_url = f"{frontend_url}/psychologist/{psychologist.id}"
+        qr_url = f"{base_url}/public/psychologist/{psychologist.id}/qr"
+        public_api_url = f"{base_url}/public/psychologist/{psychologist.id}/card"
+        
+        photo_url = None
+        if psychologist.photo:
+            photo_url = f"{base_url}/static/uploads/photos/{psychologist.photo}"
+        
+        result = {
+            "card_url": card_url,
+            "qr_code_url": qr_url,
+            "public_api_url": public_api_url,
+            "preview": {
+                "id": psychologist.id,
+                "full_name": psychologist.full_name,
+                "email": psychologist.email,
+                "phone": psychologist.phone,
+                "photo_url": photo_url,
+                "about": psychologist.about or ""
+            }
+        }
+        
+        logger.info(
+            "Card info retrieved successfully",
+            operation="get_my_card_info",
+            psychologist_id=psychologist.id
+        )
+        
+        return create_success_response(
+            message="Информация о визитке",
+            data=result
+        )
+    
+    except AccessDeniedError as e:
+        logger.warning(
+            "Access denied in get card info",
+            operation="get_my_card_info",
+            field=e.field,
+            message=e.message
+        )
+        raise create_forbidden_error(
+            field=e.field,
+            message=e.message,
+            input_data="",
+            reason="Access denied"
+        )
+    
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise
+        
+        logger.error(
+            "Unexpected error in get card info endpoint",
+            operation="get_my_card_info",
+            error_type=type(e).__name__,
+            error_message=str(e),
+            exc_info=True
+        )
+        raise create_server_error()

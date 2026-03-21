@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.core import get_db
@@ -168,7 +169,6 @@ async def get_attempt_details_endpoint(
 
 @router.get(
     "/{attempt_id}/report/{audience}",
-    response_model=SuccessResponse,
     summary="Сгенерировать отчет",
     description="""
     Генерирует отчет по результатам прохождения теста.
@@ -182,8 +182,8 @@ async def get_attempt_details_endpoint(
     - format: "html" (по умолчанию) или "docx"
     
     **Форматы:**
-    - HTML - для просмотра в браузере (возвращает content)
-    - DOCX - для скачивания (возвращает download_url)
+    - HTML - для просмотра в браузере (возвращает JSON с content)
+    - DOCX - для скачивания (возвращает файл напрямую)
     
     **Отчет включает:**
     - Данные профиля клиента
@@ -211,8 +211,7 @@ async def get_attempt_details_endpoint(
                             "audience": "client",
                             "format": "html",
                             "generated_at": "2026-03-21T14:00:00",
-                            "content": "<!DOCTYPE html>...",
-                            "download_url": None
+                            "content": "<!DOCTYPE html>..."
                         },
                         "errors": None
                     }
@@ -239,6 +238,7 @@ async def generate_report_endpoint(
         AttemptNotFound,
         AccessDenied
     )
+    from app.database.crud.test_attempt_crud import get_attempt_by_id
     
     logger.info(
         "Generate report endpoint called",
@@ -282,6 +282,18 @@ async def generate_report_endpoint(
             audience=audience,
             format=format
         )
+        
+        if format == "docx":
+            attempt = await get_attempt_by_id(session, attempt_id)
+            filename = f"report_{audience}_{attempt.client_name}_{attempt_id}.docx"
+            
+            return StreamingResponse(
+                result,
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}"
+                }
+            )
         
         return create_success_response(
             message="Отчет сгенерирован",
