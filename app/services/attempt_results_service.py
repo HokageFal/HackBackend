@@ -2,11 +2,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from datetime import datetime
 from io import BytesIO
-from docx import Document
-from docx.shared import Pt, RGBColor, Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from app.core.logging_config import get_logger
+from app.core.report_template_engine import ReportTemplateEngine, get_default_template
 from app.database.crud.test_crud import get_test_by_id
 from app.database.crud.test_attempt_crud import get_attempts_by_test, get_attempt_by_id
 from app.database.crud.user_answer_crud import get_answers_by_attempt
@@ -40,80 +38,6 @@ class AccessDenied(Exception):
         self.field = field
         self.message = message
         super().__init__(message)
-
-
-def generate_docx_report(
-    test_title: str,
-    client_name: str,
-    submitted_at: datetime,
-    profile_data: list,
-    answers: list,
-    calculated_metrics: dict,
-    audience: str
-) -> BytesIO:
-    doc = Document()
-    
-    title = doc.add_heading(f'Отчет: {test_title}', 0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    info_section = doc.add_paragraph()
-    info_section.add_run('Информация о прохождении\n').bold = True
-    info_section.add_run(f'Клиент: {client_name}\n')
-    info_section.add_run(f'Дата прохождения: {submitted_at.strftime("%d.%m.%Y %H:%M")}\n')
-    info_section.add_run(f'Тип отчета: {"Для клиента" if audience == "client" else "Для психолога"}\n')
-    
-    doc.add_heading('Данные профиля', level=1)
-    
-    if profile_data:
-        for pd in profile_data:
-            p = doc.add_paragraph()
-            p.add_run(f'{pd["field_name"]}: ').bold = True
-            p.add_run(str(pd["value"]) if pd["value"] else "Не указано")
-    else:
-        doc.add_paragraph('Данные профиля не заполнены')
-    
-    doc.add_heading('Ответы на вопросы', level=1)
-    
-    for i, ans in enumerate(answers, 1):
-        question_p = doc.add_paragraph()
-        question_p.add_run(f'{i}. {ans["question_text"]}').bold = True
-        
-        answer_p = doc.add_paragraph(style='List Bullet')
-        
-        if ans["answer_value"] is not None:
-            answer_text = str(ans["answer_value"])
-            if isinstance(ans["answer_value"], bool):
-                answer_text = "Да" if ans["answer_value"] else "Нет"
-            answer_p.add_run(f'Ответ: {answer_text}')
-        
-        if ans["selected_options"]:
-            options_text = ", ".join([opt["option_text"] for opt in ans["selected_options"]])
-            answer_p.add_run(f'Выбрано: {options_text}')
-        
-        if not ans["answer_value"] and not ans["selected_options"]:
-            answer_p.add_run('Ответ не предоставлен')
-    
-    if calculated_metrics:
-        doc.add_heading('Метрики и результаты', level=1)
-        
-        for name, data in calculated_metrics.items():
-            metric_p = doc.add_paragraph()
-            metric_p.add_run(f'{name}: ').bold = True
-            metric_p.add_run(f'{data["value"]}\n')
-            if data.get("description"):
-                metric_p.add_run(data["description"]).italic = True
-    
-    footer_p = doc.add_paragraph()
-    footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer_run = footer_p.add_run('\nОтчет сгенерирован автоматически системой ПрофДНК')
-    footer_run.font.size = Pt(9)
-    footer_run.font.color.rgb = RGBColor(128, 128, 128)
-    
-    buffer = BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    
-    return buffer
 
 
 async def get_test_attempts_service(
@@ -372,19 +296,25 @@ async def generate_report_service(
         templates = await get_report_templates_by_test(session, attempt.test_id)
         template = next((t for t in templates if t.audience.value == audience), None)
         
-        if not template:
+        template_definition = None
+        if template:
+            template_definition = template.template_definition
+        else:
             logger.info(
                 "Report template not found, using default",
                 operation="generate_report_service",
                 attempt_id=attempt_id,
                 audience=audience
             )
+            template_definition = get_default_template(audience)
         
         if format == "docx":
-            docx_buffer = generate_docx_report(
+            engine = ReportTemplateEngine(template_definition)
+            
+            docx_buffer = engine.generate_docx(
                 test_title=test.title,
                 client_name=attempt.client_name,
-                submitted_at=attempt.submitted_at,
+                submitted_at=attempt.submitted_at.strftime('%d.%m.%Y %H:%M'),
                 profile_data=attempt_details["profile_data"],
                 answers=attempt_details["answers"],
                 calculated_metrics=calculated_metrics,

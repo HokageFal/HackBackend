@@ -287,13 +287,12 @@ async def generate_report_endpoint(
         if format == "docx":
             attempt = await get_attempt_by_id(session, attempt_id)
             filename = f"report_{audience}_{attempt_id}.docx"
-            filename_encoded = quote(filename)
             
             return StreamingResponse(
                 result,
                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 headers={
-                    "Content-Disposition": f"attachment; filename*=UTF-8''{filename_encoded}"
+                    "Content-Disposition": f'attachment; filename="{filename}"'
                 }
             )
         
