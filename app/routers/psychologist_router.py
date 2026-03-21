@@ -132,7 +132,7 @@ async def get_all_psychologists_endpoint(
     try:
         await check_is_admin(request, session)
         
-        psychologists = await get_all_psychologists_service(session)
+        psychologists, total = await get_all_psychologists_service(session)
         
         psychologists_data = [
             {

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging_config import get_logger
 from app.core.security import hash_password
 from app.core.email_utils import send_email_sync, create_psychologist_credentials_email_template
+from app.core.timezone_utils import convert_to_msk_naive
 from app.database.crud.psychologist_crud import (
     create_psychologist,
     get_all_psychologists,
@@ -42,13 +43,15 @@ async def create_psychologist_service(
         
         password_hash = hash_password(psychologist_data.password)
         
+        access_until_naive = convert_to_msk_naive(psychologist_data.access_until)
+        
         psychologist = await create_psychologist(
             session=session,
             full_name=psychologist_data.full_name,
             email=psychologist_data.email,
             phone=psychologist_data.phone,
             password_hash=password_hash,
-            access_until=psychologist_data.access_until
+            access_until=access_until_naive
         )
         
         logger.info(
@@ -152,22 +155,31 @@ async def get_psychologist_by_id_service(
         raise
 
 
-async def get_all_psychologists_service(session: AsyncSession) -> list[User]:
+async def get_all_psychologists_service(
+    session: AsyncSession,
+    skip: int = 0,
+    limit: int = 20
+) -> tuple[list[User], int]:
     logger.info(
         "Starting psychologists list retrieval",
-        operation="get_all_psychologists_service"
+        operation="get_all_psychologists_service",
+        skip=skip,
+        limit=limit
     )
     
     try:
-        psychologists = await get_all_psychologists(session)
+        psychologists, total = await get_all_psychologists(session, skip, limit)
         
         logger.info(
             "Psychologists list retrieved successfully",
             operation="get_all_psychologists_service",
-            count=len(psychologists)
+            count=len(psychologists),
+            total=total,
+            skip=skip,
+            limit=limit
         )
         
-        return psychologists
+        return psychologists, total
         
     except Exception as e:
         logger.error(
@@ -205,12 +217,14 @@ async def update_psychologist_service(
             )
             raise UserNotFound("psychologist_id", f"Психолог с ID {psychologist_id} не найден")
         
+        access_until_naive = convert_to_msk_naive(update_data.get("access_until"))
+        
         updated_psychologist = await update_psychologist(
             session=session,
             psychologist_id=psychologist_id,
             full_name=update_data.get("full_name"),
             phone=update_data.get("phone"),
-            access_until=update_data.get("access_until"),
+            access_until=access_until_naive,
             is_blocked=update_data.get("is_blocked")
         )
         
@@ -229,6 +243,60 @@ async def update_psychologist_service(
         logger.error(
             "Unexpected error during psychologist update",
             operation="update_psychologist_service",
+            psychologist_id=psychologist_id,
+            error_type=type(e).__name__,
+            error_message=str(e),
+            exc_info=True
+        )
+        raise
+
+
+
+async def update_psychologist_profile_service(
+    session: AsyncSession,
+    psychologist_id: int,
+    about_markdown: str | None = None,
+    photo_url: str | None = None
+) -> User:
+    logger.info(
+        "Starting psychologist profile update",
+        operation="update_psychologist_profile_service",
+        psychologist_id=psychologist_id
+    )
+    
+    try:
+        from app.database.crud.psychologist_crud import update_psychologist_profile
+        
+        psychologist = await update_psychologist_profile(
+            session=session,
+            psychologist_id=psychologist_id,
+            about_markdown=about_markdown,
+            photo_url=photo_url
+        )
+        
+        if not psychologist:
+            logger.warning(
+                "Psychologist profile update failed - not found",
+                operation="update_psychologist_profile_service",
+                psychologist_id=psychologist_id,
+                reason="psychologist_not_found"
+            )
+            raise UserNotFound("psychologist_id", f"Психолог с ID {psychologist_id} не найден")
+        
+        logger.info(
+            "Psychologist profile updated successfully",
+            operation="update_psychologist_profile_service",
+            psychologist_id=psychologist_id
+        )
+        
+        return psychologist
+        
+    except UserNotFound:
+        raise
+    except Exception as e:
+        logger.error(
+            "Unexpected error during psychologist profile update",
+            operation="update_psychologist_profile_service",
             psychologist_id=psychologist_id,
             error_type=type(e).__name__,
             error_message=str(e),

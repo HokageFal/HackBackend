@@ -127,11 +127,9 @@ async def refresh_access_token(request: Request, response: Response):
 )
 async def get_current_user(request: Request, session: AsyncSession = Depends(get_db)):
     try:
-        # Получаем ID пользователя из токена
-        user_id = get_user_id_from_token(request)
+        from app.core.dependencies import get_current_active_user, AccessDeniedError
         
-        # Получаем пользователя из базы данных
-        user = await get_current_user_service(session, user_id)
+        user = await get_current_active_user(request, session)
         
         return create_user_data_response(
             message="Данные пользователя получены успешно",
@@ -149,12 +147,20 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
                 "created_at": user.created_at.isoformat() if user.created_at else None
             }
         )
+    
+    except AccessDeniedError as e:
+        raise create_forbidden_error(
+            field=e.field,
+            message=e.message,
+            input_data="",
+            reason="Access denied"
+        )
         
     except UserNotFound as e:
         raise create_not_found_error(
             field=e.field,
             message=e.message,
-            input_data=user_id,
+            input_data="",
             reason="User not found in database"
         )
         

@@ -2,7 +2,7 @@
 Схемы для создания и управления психологами (только для админа).
 """
 from pydantic import BaseModel, EmailStr, Field
-from datetime import date
+from datetime import datetime
 from typing import Optional
 
 
@@ -27,9 +27,9 @@ class PsychologistCreate(BaseModel):
         max_length=100,
         description="Пароль от 8 до 100 символов"
     )
-    access_until: Optional[date] = Field(
+    access_until: Optional[datetime] = Field(
         default=None,
-        description="Дата окончания доступа (опционально)"
+        description="Дата и время окончания доступа (опционально)"
     )
     send_email: bool = Field(
         default=True,
@@ -50,9 +50,9 @@ class PsychologistUpdate(BaseModel):
         max_length=20,
         description="Телефон психолога"
     )
-    access_until: Optional[date] = Field(
+    access_until: Optional[datetime] = Field(
         default=None,
-        description="Дата окончания доступа"
+        description="Дата и время окончания доступа"
     )
     is_blocked: Optional[bool] = Field(
         default=None,
@@ -72,3 +72,12 @@ class PsychologistResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+
+class PsychologistProfileUpdate(BaseModel):
+    about_markdown: Optional[str] = Field(
+        default=None,
+        max_length=5000,
+        description="Описание психолога в формате Markdown"
+    )
