@@ -373,18 +373,19 @@ async def update_test_service(
         # Получаем только те поля, которые были явно переданы
         update_data = test_data.model_dump(exclude_unset=True)
         
-        # Конвертируем access_until если он был передан
+        # Обновляем поля напрямую
+        if 'title' in update_data:
+            test.title = update_data['title']
+        
         if 'access_until' in update_data:
-            update_data['access_until'] = convert_to_msk_naive(update_data['access_until'])
+            test.access_until = convert_to_msk_naive(update_data['access_until'])
         
-        updated_test = await update_test(
-            session=session,
-            test_id=test_id,
-            **update_data
-        )
+        if 'client_can_view_report' in update_data:
+            test.client_can_view_report = update_data['client_can_view_report']
         
+        await session.flush()
         await session.commit()
-        await session.refresh(updated_test)
+        await session.refresh(test)
         
         logger.info(
             "Test updated successfully",
@@ -392,7 +393,7 @@ async def update_test_service(
             test_id=test_id
         )
         
-        return updated_test
+        return test
         
     except (TestNotFound, TestAccessDenied):
         raise
