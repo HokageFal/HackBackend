@@ -87,6 +87,7 @@ async def update_test(
         test.client_can_view_report = client_can_view_report
     
     await session.flush()
+    await session.refresh(test)
     return test
 
 

@@ -370,17 +370,21 @@ async def update_test_service(
             )
             raise TestAccessDenied("test_id", "У вас нет доступа к этому тесту")
         
-        access_until_naive = convert_to_msk_naive(test_data.access_until)
+        # Получаем только те поля, которые были явно переданы
+        update_data = test_data.model_dump(exclude_unset=True)
+        
+        # Конвертируем access_until если он был передан
+        if 'access_until' in update_data:
+            update_data['access_until'] = convert_to_msk_naive(update_data['access_until'])
         
         updated_test = await update_test(
             session=session,
             test_id=test_id,
-            title=test_data.title,
-            access_until=access_until_naive,
-            client_can_view_report=test_data.client_can_view_report
+            **update_data
         )
         
         await session.commit()
+        await session.refresh(updated_test)
         
         logger.info(
             "Test updated successfully",
