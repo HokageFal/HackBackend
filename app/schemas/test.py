@@ -9,18 +9,6 @@ class TestCreate(BaseModel):
     client_can_view_report: bool = Field(default=False, description="Может ли клиент видеть отчет")
 
 
-class TestUpdate(BaseModel):
-    """Обновление теста со всеми вложенными данными"""
-    title: Optional[str] = Field(default=None, min_length=1, max_length=500, description="Название теста")
-    access_until: Optional[datetime] = Field(default=None, description="Дата и время окончания доступа")
-    client_can_view_report: Optional[bool] = Field(default=None, description="Может ли клиент видеть отчет")
-    profile_fields: Optional[list[ProfileFieldUpdate]] = Field(default=None, description="Поля профиля")
-    sections: Optional[list[SectionUpdate]] = Field(default=None, description="Секции теста")
-    questions: Optional[list[QuestionUpdate]] = Field(default=None, description="Вопросы теста")
-    metrics: Optional[list[MetricUpdate]] = Field(default=None, description="Метрики теста")
-    report_templates: Optional[list[ReportTemplateUpdate]] = Field(default=None, description="Шаблоны отчетов")
-
-
 class ProfileFieldUpdate(BaseModel):
     id: Optional[int] = Field(default=None, description="ID поля (если обновление существующего)")
     label: str = Field(min_length=1, max_length=200, description="Название поля")
@@ -64,6 +52,18 @@ class ReportTemplateUpdate(BaseModel):
     id: Optional[int] = Field(default=None, description="ID шаблона (если обновление существующего)")
     audience: str = Field(description="Аудитория: client или psychologist")
     template_definition: dict = Field(description="Определение шаблона отчета")
+
+
+class TestUpdate(BaseModel):
+    """Обновление теста со всеми вложенными данными"""
+    title: Optional[str] = Field(default=None, min_length=1, max_length=500, description="Название теста")
+    access_until: Optional[datetime] = Field(default=None, description="Дата и время окончания доступа")
+    client_can_view_report: Optional[bool] = Field(default=None, description="Может ли клиент видеть отчет")
+    profile_fields: Optional[list[ProfileFieldUpdate]] = Field(default=None, description="Поля профиля")
+    sections: Optional[list[SectionUpdate]] = Field(default=None, description="Секции теста")
+    questions: Optional[list[QuestionUpdate]] = Field(default=None, description="Вопросы теста")
+    metrics: Optional[list[MetricUpdate]] = Field(default=None, description="Метрики теста")
+    report_templates: Optional[list[ReportTemplateUpdate]] = Field(default=None, description="Шаблоны отчетов")
 
 
 class TestResponse(BaseModel):
