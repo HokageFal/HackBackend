@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from urllib.parse import quote
 
 from app.database.core import get_db
 from app.core.response_utils import (
@@ -285,13 +286,14 @@ async def generate_report_endpoint(
         
         if format == "docx":
             attempt = await get_attempt_by_id(session, attempt_id)
-            filename = f"report_{audience}_{attempt.client_name}_{attempt_id}.docx"
+            filename = f"report_{audience}_{attempt_id}.docx"
+            filename_encoded = quote(filename)
             
             return StreamingResponse(
                 result,
                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 headers={
-                    "Content-Disposition": f"attachment; filename={filename}"
+                    "Content-Disposition": f"attachment; filename*=UTF-8''{filename_encoded}"
                 }
             )
         
