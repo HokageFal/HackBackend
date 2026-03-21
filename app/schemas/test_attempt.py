@@ -9,6 +9,7 @@ class ProfileValueCreate(BaseModel):
     text_value: Optional[str] = Field(None, description="Текстовое значение")
     number_value: Optional[Decimal] = Field(None, description="Числовое значение")
     date_value: Optional[date] = Field(None, description="Значение даты")
+    datetime_value: Optional[datetime] = Field(None, description="Значение даты и времени")
 
 
 class AttemptCreate(BaseModel):

@@ -22,5 +22,6 @@ class ProfileFieldType(str, enum.Enum):
     text = "text"
     number = "number"
     date = "date"
+    datetime = "datetime"
     email = "email"
     phone = "phone"

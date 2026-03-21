@@ -1,6 +1,6 @@
-from sqlalchemy import BigInteger, String, Numeric, Date, ForeignKey, UniqueConstraint
+from sqlalchemy import BigInteger, String, Numeric, Date, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from decimal import Decimal
 
@@ -27,6 +27,7 @@ class TestAttemptProfileValue(Base):
     text_value: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     number_value: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
     date_value: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    datetime_value: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     attempt: Mapped["TestAttempt"] = relationship("TestAttempt", back_populates="profile_values")
     profile_field: Mapped["TestProfileField"] = relationship("TestProfileField", back_populates="profile_values")
