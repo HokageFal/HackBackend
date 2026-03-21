@@ -753,18 +753,18 @@ async def get_test_link_endpoint(
     try:
         psychologist = await get_current_psychologist(request, session)
         
-        test = await get_test_by_id_service(session, test_id, psychologist.id)
+        result = await get_test_by_id_service(session, test_id, psychologist.id)
         
         base_url = os.getenv("BASE_URL", "http://localhost:8000")
-        public_link = f"{base_url}/public/tests/{test.public_link_token}"
+        public_link = f"{base_url}/public/tests/{result['public_link_token']}"
         
         return create_success_response(
             message="Публичная ссылка получена",
             data={
-                "test_id": test.id,
-                "title": test.title,
+                "test_id": result["id"],
+                "title": result["title"],
                 "public_link": public_link,
-                "public_link_token": test.public_link_token
+                "public_link_token": result["public_link_token"]
             }
         )
     

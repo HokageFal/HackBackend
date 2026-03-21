@@ -54,6 +54,8 @@ async def create_psychologist_service(
             access_until=access_until_naive
         )
         
+        await session.commit()
+        
         logger.info(
             "Psychologist created successfully",
             operation="create_psychologist_service",
@@ -97,8 +99,10 @@ async def create_psychologist_service(
         return psychologist
         
     except UserAlreadyExists:
+        await session.rollback()
         raise
     except Exception as e:
+        await session.rollback()
         logger.error(
             "Unexpected error during psychologist creation",
             operation="create_psychologist_service",
@@ -228,6 +232,8 @@ async def update_psychologist_service(
             is_blocked=update_data.get("is_blocked")
         )
         
+        await session.commit()
+        
         logger.info(
             "Psychologist updated successfully",
             operation="update_psychologist_service",
@@ -238,8 +244,10 @@ async def update_psychologist_service(
         return updated_psychologist
         
     except (UserNotFound, UserAlreadyExists):
+        await session.rollback()
         raise
     except Exception as e:
+        await session.rollback()
         logger.error(
             "Unexpected error during psychologist update",
             operation="update_psychologist_service",
@@ -283,6 +291,8 @@ async def update_psychologist_profile_service(
             )
             raise UserNotFound("psychologist_id", f"Психолог с ID {psychologist_id} не найден")
         
+        await session.commit()
+        
         logger.info(
             "Psychologist profile updated successfully",
             operation="update_psychologist_profile_service",
@@ -292,8 +302,10 @@ async def update_psychologist_profile_service(
         return psychologist
         
     except UserNotFound:
+        await session.rollback()
         raise
     except Exception as e:
+        await session.rollback()
         logger.error(
             "Unexpected error during psychologist profile update",
             operation="update_psychologist_profile_service",

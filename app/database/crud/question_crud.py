@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
@@ -99,3 +99,18 @@ async def delete_question(session: AsyncSession, question_id: int) -> bool:
     await session.flush()
     return True
 
+
+
+async def count_questions_by_test(session: AsyncSession, test_id: int) -> int:
+    result = await session.execute(
+        select(func.count(Question.id))
+        .where(Question.test_id == test_id)
+    )
+    return result.scalar() or 0
+
+
+async def get_question_by_id(session: AsyncSession, question_id: int) -> Optional[Question]:
+    result = await session.execute(
+        select(Question).where(Question.id == question_id)
+    )
+    return result.scalars().first()

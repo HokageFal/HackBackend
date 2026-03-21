@@ -71,3 +71,10 @@ async def delete_option(session: AsyncSession, option_id: int) -> bool:
     await session.flush()
     return True
 
+
+
+async def get_option_by_id(session: AsyncSession, option_id: int) -> Optional[QuestionOption]:
+    result = await session.execute(
+        select(QuestionOption).where(QuestionOption.id == option_id)
+    )
+    return result.scalars().first()

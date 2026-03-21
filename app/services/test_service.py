@@ -7,6 +7,7 @@ from app.core.timezone_utils import convert_to_msk_naive
 from app.database.crud.test_crud import (
     create_test,
     get_test_by_id,
+    get_test_by_token,
     get_tests_by_psychologist,
     update_test,
     delete_test
@@ -703,6 +704,115 @@ async def import_test_service(
             "Unexpected error during test import",
             operation="import_test_service",
             psychologist_id=psychologist_id,
+            error_type=type(e).__name__,
+            error_message=str(e),
+            exc_info=True
+        )
+        raise
+
+
+
+async def get_test_by_token_service(
+    session: AsyncSession,
+    token: str
+) -> dict:
+    logger.info(
+        "Starting public test retrieval by token",
+        operation="get_test_by_token_service",
+        token=token
+    )
+    
+    try:
+        test = await get_test_by_token(session, token)
+        
+        if not test:
+            logger.warning(
+                "Test not found by token",
+                operation="get_test_by_token_service",
+                token=token,
+                reason="test_not_found"
+            )
+            raise TestNotFound("token", f"Тест с токеном {token} не найден")
+        
+        if test.access_until:
+            from app.core.timezone_utils import get_current_msk_time
+            now = get_current_msk_time()
+            if test.access_until < now:
+                logger.warning(
+                    "Test access expired",
+                    operation="get_test_by_token_service",
+                    token=token,
+                    access_until=test.access_until.isoformat(),
+                    reason="access_expired"
+                )
+                raise TestAccessDenied("access_until", "Срок доступа к тесту истек")
+        
+        profile_fields = await get_profile_fields_by_test(session, test.id)
+        sections = await get_sections_by_test(session, test.id)
+        questions = await get_questions_by_test(session, test.id)
+        
+        questions_with_options = []
+        for question in questions:
+            options = await get_options_by_question(session, question.id)
+            questions_with_options.append({
+                "id": question.id,
+                "section_id": question.section_id,
+                "question_text": question.text,
+                "question_type": question.type.value,
+                "is_required": True,
+                "display_order": question.position,
+                "settings": question.settings_json,
+                "options": [
+                    {
+                        "id": opt.id,
+                        "option_text": opt.text,
+                        "option_value": opt.position,
+                        "display_order": opt.position
+                    }
+                    for opt in options
+                ]
+            })
+        
+        result = {
+            "id": test.id,
+            "title": test.title,
+            "client_can_view_report": test.client_can_view_report,
+            "profile_fields": [
+                {
+                    "id": pf.id,
+                    "field_name": pf.label,
+                    "field_type": pf.type.value,
+                    "is_required": pf.is_required,
+                    "display_order": pf.position
+                }
+                for pf in profile_fields
+            ],
+            "sections": [
+                {
+                    "id": s.id,
+                    "title": s.title,
+                    "display_order": s.position
+                }
+                for s in sections
+            ],
+            "questions": questions_with_options
+        }
+        
+        logger.info(
+            "Public test retrieved successfully",
+            operation="get_test_by_token_service",
+            test_id=test.id
+        )
+        
+        return result
+        
+    except (TestNotFound, TestAccessDenied):
+        raise
+    except Exception as e:
+        logger.error(
+            "Unexpected error during public test retrieval",
+            operation="get_test_by_token_service",
+            token=token,
             error_type=type(e).__name__,
             error_message=str(e),
             exc_info=True
