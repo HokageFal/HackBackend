@@ -9,23 +9,23 @@ from app.database.models.enums import QuestionType
 async def create_question(
     session: AsyncSession,
     test_id: int,
-    text: str,
+    question_text: str,
     question_type: QuestionType,
-    position: int,
+    display_order: Optional[int] = None,
     section_id: Optional[int] = None,
-    settings_json: Optional[dict] = None
+    is_required: bool = True,
+    settings: Optional[dict] = None
 ) -> Question:
     question = Question(
         test_id=test_id,
         section_id=section_id,
-        text=text,
+        text=question_text,
         type=question_type,
-        position=position,
-        settings_json=settings_json
+        position=display_order or 0,
+        settings_json=settings
     )
     session.add(question)
-    await session.commit()
-    await session.refresh(question)
+    await session.flush()
     return question
 
 
@@ -81,8 +81,8 @@ async def update_question(
     if settings_json is not None:
         question.settings_json = settings_json
     
-    await session.commit()
-    await session.refresh(question)
+    await session.flush()
+    # await session.refresh(question)
     return question
 
 
@@ -96,5 +96,6 @@ async def delete_question(session: AsyncSession, question_id: int) -> bool:
         return False
     
     await session.delete(question)
-    await session.commit()
+    await session.flush()
     return True
+

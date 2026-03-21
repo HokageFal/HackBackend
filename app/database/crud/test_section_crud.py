@@ -9,16 +9,15 @@ async def create_section(
     session: AsyncSession,
     test_id: int,
     title: str,
-    position: int
+    display_order: Optional[int] = None
 ) -> TestSection:
     section = TestSection(
         test_id=test_id,
         title=title,
-        position=position
+        position=display_order or 0
     )
     session.add(section)
-    await session.commit()
-    await session.refresh(section)
+    await session.flush()
     return section
 
 
@@ -53,8 +52,8 @@ async def update_section(
     if position is not None:
         section.position = position
     
-    await session.commit()
-    await session.refresh(section)
+    await session.flush()
+    # await session.refresh(section)
     return section
 
 
@@ -68,5 +67,6 @@ async def delete_section(session: AsyncSession, section_id: int) -> bool:
         return False
     
     await session.delete(section)
-    await session.commit()
+    await session.flush()
     return True
+

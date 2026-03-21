@@ -80,7 +80,6 @@ async def create_test_service(
                 session=session,
                 test_id=test.id,
                 title=section_data.get("title"),
-                description=section_data.get("description"),
                 display_order=section_data.get("display_order")
             )
             temp_id = section_data.get("temp_id") or section_data.get("id")
@@ -91,10 +90,10 @@ async def create_test_service(
             await create_profile_field(
                 session=session,
                 test_id=test.id,
-                field_name=pf_data.get("field_name"),
+                label=pf_data.get("field_name") or pf_data.get("label"),
                 field_type=ProfileFieldType(pf_data.get("field_type")),
                 is_required=pf_data.get("is_required", True),
-                display_order=pf_data.get("display_order")
+                position=pf_data.get("display_order") or 0
             )
         
         question_id_map = {}
@@ -142,6 +141,8 @@ async def create_test_service(
                 template_definition=t_data.get("template_definition", {})
             )
         
+        await session.commit()
+        
         logger.info(
             "Test with full structure created successfully",
             operation="create_test_service",
@@ -152,6 +153,7 @@ async def create_test_service(
         return await get_test_by_id_service(session, test.id, psychologist_id)
         
     except Exception as e:
+        await session.rollback()
         logger.error(
             "Unexpected error during test creation",
             operation="create_test_service",
@@ -249,17 +251,17 @@ async def get_test_by_id_service(
             questions_with_options.append({
                 "id": question.id,
                 "section_id": question.section_id,
-                "question_text": question.question_text,
-                "question_type": question.question_type.value,
-                "is_required": question.is_required,
-                "display_order": question.display_order,
-                "settings": question.settings,
+                "question_text": question.text,
+                "question_type": question.type.value,
+                "is_required": True,
+                "display_order": question.position,
+                "settings": question.settings_json,
                 "options": [
                     {
                         "id": opt.id,
-                        "option_text": opt.option_text,
-                        "option_value": opt.option_value,
-                        "display_order": opt.display_order
+                        "option_text": opt.text,
+                        "option_value": opt.position,
+                        "display_order": opt.position
                     }
                     for opt in options
                 ]
@@ -275,10 +277,10 @@ async def get_test_by_id_service(
             "profile_fields": [
                 {
                     "id": pf.id,
-                    "field_name": pf.field_name,
-                    "field_type": pf.field_type.value,
+                    "field_name": pf.label,
+                    "field_type": pf.type.value,
                     "is_required": pf.is_required,
-                    "display_order": pf.display_order
+                    "display_order": pf.position
                 }
                 for pf in profile_fields
             ],
@@ -286,8 +288,7 @@ async def get_test_by_id_service(
                 {
                     "id": s.id,
                     "title": s.title,
-                    "description": s.description,
-                    "display_order": s.display_order
+                    "display_order": s.position
                 }
                 for s in sections
             ],
@@ -511,38 +512,37 @@ async def export_test_service(
             },
             "profile_fields": [
                 {
-                    "field_name": pf.field_name,
-                    "field_type": pf.field_type.value,
+                    "field_name": pf.label,
+                    "field_type": pf.type.value,
                     "is_required": pf.is_required,
-                    "display_order": pf.display_order
+                    "display_order": pf.position
                 }
                 for pf in profile_fields
             ],
             "sections": [
                 {
                     "title": s.title,
-                    "description": s.description,
-                    "display_order": s.display_order
+                    "display_order": s.position
                 }
                 for s in sections
             ],
             "questions": [
                 {
                     "section_id_ref": q.section_id,
-                    "question_text": q.question_text,
-                    "question_type": q.question_type.value,
-                    "is_required": q.is_required,
-                    "display_order": q.display_order,
-                    "settings": q.settings
+                    "question_text": q.text,
+                    "question_type": q.type.value,
+                    "is_required": True,
+                    "display_order": q.position,
+                    "settings": q.settings_json
                 }
                 for q in questions
             ],
             "question_options": [
                 {
                     "question_id_ref": opt.question_id,
-                    "option_text": opt.option_text,
-                    "option_value": opt.option_value,
-                    "display_order": opt.display_order
+                    "option_text": opt.text,
+                    "option_value": opt.position,
+                    "display_order": opt.position
                 }
                 for opt in all_options
             ],
@@ -628,7 +628,6 @@ async def import_test_service(
                 session=session,
                 test_id=test.id,
                 title=section_data.get("title"),
-                description=section_data.get("description"),
                 display_order=section_data.get("display_order")
             )
             section_id_map[section_data.get("display_order")] = section.id
@@ -637,10 +636,10 @@ async def import_test_service(
             await create_profile_field(
                 session=session,
                 test_id=test.id,
-                field_name=pf_data.get("field_name"),
+                label=pf_data.get("field_name") or pf_data.get("label"),
                 field_type=ProfileFieldType(pf_data.get("field_type")),
                 is_required=pf_data.get("is_required", True),
-                display_order=pf_data.get("display_order")
+                position=pf_data.get("display_order") or 0
             )
         
         question_id_map = {}

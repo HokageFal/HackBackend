@@ -22,8 +22,8 @@ async def create_profile_field(
         position=position
     )
     session.add(field)
-    await session.commit()
-    await session.refresh(field)
+    await session.flush()
+    # await session.refresh(field)
     return field
 
 
@@ -64,8 +64,8 @@ async def update_profile_field(
     if position is not None:
         field.position = position
     
-    await session.commit()
-    await session.refresh(field)
+    await session.flush()
+    # await session.refresh(field)
     return field
 
 
@@ -79,5 +79,6 @@ async def delete_profile_field(session: AsyncSession, field_id: int) -> bool:
         return False
     
     await session.delete(field)
-    await session.commit()
+    await session.flush()
     return True
+

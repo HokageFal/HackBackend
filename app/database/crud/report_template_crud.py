@@ -18,8 +18,8 @@ async def create_report_template(
         template_definition=template_definition
     )
     session.add(template)
-    await session.commit()
-    await session.refresh(template)
+    await session.flush()
+    # await session.refresh(template)
     return template
 
 
@@ -62,8 +62,8 @@ async def update_report_template(
     
     template.template_definition = template_definition
     
-    await session.commit()
-    await session.refresh(template)
+    await session.flush()
+    # await session.refresh(template)
     return template
 
 
@@ -77,5 +77,6 @@ async def delete_report_template(session: AsyncSession, template_id: int) -> boo
         return False
     
     await session.delete(template)
-    await session.commit()
+    await session.flush()
     return True
+

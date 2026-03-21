@@ -17,8 +17,8 @@ async def create_metric(
         formula=formula
     )
     session.add(metric)
-    await session.commit()
-    await session.refresh(metric)
+    await session.flush()
+    # await session.refresh(metric)
     return metric
 
 
@@ -51,8 +51,8 @@ async def update_metric(
     if formula is not None:
         metric.formula = formula
     
-    await session.commit()
-    await session.refresh(metric)
+    await session.flush()
+    # await session.refresh(metric)
     return metric
 
 
@@ -66,5 +66,6 @@ async def delete_metric(session: AsyncSession, metric_id: int) -> bool:
         return False
     
     await session.delete(metric)
-    await session.commit()
+    await session.flush()
     return True
+

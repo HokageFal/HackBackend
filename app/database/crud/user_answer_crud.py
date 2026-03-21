@@ -25,8 +25,8 @@ async def create_user_answer(
         datetime_answer=datetime_answer
     )
     session.add(answer)
-    await session.commit()
-    await session.refresh(answer)
+    await session.flush()
+    # await session.refresh(answer)
     return answer
 
 
@@ -53,3 +53,4 @@ async def get_answer_by_question(
         )
     )
     return result.scalars().first()
+

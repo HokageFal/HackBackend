@@ -25,8 +25,8 @@ async def create_psychologist(
     )
     
     session.add(psychologist)
-    await session.commit()
-    await session.refresh(psychologist)
+    await session.flush()
+    # await session.refresh(psychologist)
     return psychologist
 
 
@@ -82,8 +82,8 @@ async def update_psychologist_access(
     if is_blocked is not None:
         psychologist.is_blocked = is_blocked
     
-    await session.commit()
-    await session.refresh(psychologist)
+    await session.flush()
+    # await session.refresh(psychologist)
     return psychologist
 
 
@@ -118,8 +118,8 @@ async def update_psychologist(
     if is_blocked is not None:
         psychologist.is_blocked = is_blocked
     
-    await session.commit()
-    await session.refresh(psychologist)
+    await session.flush()
+    # await session.refresh(psychologist)
     return psychologist
 
 
@@ -147,6 +147,7 @@ async def update_psychologist_profile(
     if photo_url is not None:
         psychologist.photo_url = photo_url
     
-    await session.commit()
-    await session.refresh(psychologist)
+    await session.flush()
+    # await session.refresh(psychologist)
     return psychologist
+

@@ -23,8 +23,8 @@ async def create_profile_value(
         date_value=date_value
     )
     session.add(value)
-    await session.commit()
-    await session.refresh(value)
+    await session.flush()
+    # await session.refresh(value)
     return value
 
 
@@ -37,3 +37,4 @@ async def get_profile_values_by_attempt(
         .where(TestAttemptProfileValue.attempt_id == attempt_id)
     )
     return list(result.scalars().all())
+

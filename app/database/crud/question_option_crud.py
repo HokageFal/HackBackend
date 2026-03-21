@@ -8,17 +8,17 @@ from app.database.models.question_options import QuestionOption
 async def create_option(
     session: AsyncSession,
     question_id: int,
-    text: str,
-    position: int
+    option_text: str,
+    option_value: Optional[int] = None,
+    display_order: Optional[int] = None
 ) -> QuestionOption:
     option = QuestionOption(
         question_id=question_id,
-        text=text,
-        position=position
+        text=option_text,
+        position=display_order or 0
     )
     session.add(option)
-    await session.commit()
-    await session.refresh(option)
+    await session.flush()
     return option
 
 
@@ -53,8 +53,8 @@ async def update_option(
     if position is not None:
         option.position = position
     
-    await session.commit()
-    await session.refresh(option)
+    await session.flush()
+    # await session.refresh(option)
     return option
 
 
@@ -68,5 +68,6 @@ async def delete_option(session: AsyncSession, option_id: int) -> bool:
         return False
     
     await session.delete(option)
-    await session.commit()
+    await session.flush()
     return True
+

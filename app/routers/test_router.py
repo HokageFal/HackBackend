@@ -35,12 +35,171 @@ router = APIRouter(prefix="/tests", tags=["Tests"])
     response_model=SuccessResponse,
     status_code=201,
     summary="Создать тест",
-    description="Создает новый тест со всей структурой (секции, вопросы, опции, поля профиля, метрики, шаблоны)"
+    description="""
+    Создает новый тест со всей структурой одним запросом.
+    
+    **Структура запроса:**
+    - `test` - базовые настройки теста
+    - `sections` - секции/разделы теста (опционально)
+    - `questions` - вопросы с вариантами ответов
+    - `profile_fields` - дополнительные поля профиля клиента (опционально)
+    - `metrics` - формулы для расчета метрик (опционально)
+    - `report_templates` - шаблоны отчетов (опционально)
+    
+    **Связи:**
+    - Используйте `temp_id` в секциях для связи с вопросами
+    - В вопросах указывайте `section_id` = `temp_id` секции
+    - Варианты ответов (`options`) вкладываются прямо в вопрос
+    
+    **Типы вопросов:**
+    - `text` - текстовый ответ
+    - `textarea` - многострочный текст
+    - `single_choice` - один из списка
+    - `multiple_choice` - множественный выбор
+    - `boolean` - да/нет
+    - `number` - числовой ответ
+    - `slider` - диапазон
+    - `datetime` - выбор даты/времени
+    - `rating_scale` - шкала оценки
+    """,
+    responses={
+        201: {
+            "description": "Тест успешно создан",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Тест успешно создан",
+                        "data": {
+                            "id": 1,
+                            "title": "Тест на профориентацию",
+                            "public_link_token": "abc123xyz",
+                            "access_until": "2026-12-31T23:59:59",
+                            "client_can_view_report": False,
+                            "attempts_count": 0,
+                            "sections": [
+                                {
+                                    "id": 1,
+                                    "title": "Личные качества",
+                                    "description": "Оцените свои качества",
+                                    "display_order": 1
+                                }
+                            ],
+                            "questions": [
+                                {
+                                    "id": 1,
+                                    "section_id": 1,
+                                    "question_text": "Как вы оцениваете свою коммуникабельность?",
+                                    "question_type": "rating",
+                                    "is_required": True,
+                                    "display_order": 1,
+                                    "settings": {"min": 1, "max": 10},
+                                    "options": []
+                                }
+                            ],
+                            "profile_fields": [],
+                            "metrics": [],
+                            "report_templates": []
+                        },
+                        "errors": None
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Не авторизован",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "message": "Токен не найден",
+                        "data": None,
+                        "errors": [{"field": "token", "message": "Токен не найден"}]
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Доступ запрещен (не психолог или заблокирован)",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "message": "Доступ разрешен только психологам",
+                        "data": None,
+                        "errors": [{"field": "role", "message": "Доступ разрешен только психологам"}]
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Внутренняя ошибка сервера",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "message": "Внутренняя ошибка сервера",
+                        "data": None,
+                        "errors": None
+                    }
+                }
+            }
+        }
+    }
 )
 async def create_test_endpoint(
-    test_data: dict,
     request: Request,
-    session: AsyncSession = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
+    test_data: dict = {
+        "test": {
+            "title": "Тест на профориентацию",
+            "access_until": "2026-12-31T23:59:59",
+            "client_can_view_report": False
+        },
+        "sections": [
+            {
+                "temp_id": "section1",
+                "title": "Личные качества",
+                "description": "Оцените свои личные качества",
+                "display_order": 1
+            }
+        ],
+        "questions": [
+            {
+                "temp_id": "q1",
+                "section_id": "section1",
+                "question_text": "Как вы оцениваете свою коммуникабельность?",
+                "question_type": "rating_scale",
+                "is_required": True,
+                "display_order": 1,
+                "settings": {"min": 1, "max": 10},
+                "options": []
+            },
+            {
+                "temp_id": "q2",
+                "section_id": "section1",
+                "question_text": "Вы предпочитаете работать в команде?",
+                "question_type": "single_choice",
+                "is_required": True,
+                "display_order": 2,
+                "options": [
+                    {"option_text": "Да", "option_value": 1, "display_order": 1},
+                    {"option_text": "Нет", "option_value": 0, "display_order": 2},
+                    {"option_text": "Иногда", "option_value": 2, "display_order": 3}
+                ]
+            }
+        ],
+        "profile_fields": [
+            {
+                "field_name": "Возраст",
+                "field_type": "number",
+                "is_required": True,
+                "display_order": 1
+            }
+        ],
+        "metrics": [],
+        "report_templates": []
+    }
 ):
     logger.info(
         "Create test endpoint called",
@@ -95,7 +254,59 @@ async def create_test_endpoint(
     "",
     response_model=SuccessResponse,
     summary="Получить список тестов",
-    description="Получает список тестов психолога с пагинацией"
+    description="""
+    Получает список тестов психолога с пагинацией.
+    
+    **Параметры:**
+    - `page` - номер страницы (по умолчанию 1)
+    - `limit` - количество на странице (по умолчанию 20, макс 100)
+    
+    **Возвращает:**
+    - Список тестов (краткая информация)
+    - Информацию о пагинации
+    """,
+    responses={
+        200: {
+            "description": "Список тестов получен",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Найдено тестов: 15",
+                        "data": {
+                            "tests": [
+                                {
+                                    "id": 1,
+                                    "title": "Тест на профориентацию",
+                                    "public_link_token": "abc123xyz",
+                                    "access_until": "2026-12-31T23:59:59",
+                                    "client_can_view_report": False,
+                                    "attempts_count": 5
+                                },
+                                {
+                                    "id": 2,
+                                    "title": "Тест на лидерство",
+                                    "public_link_token": "def456uvw",
+                                    "access_until": None,
+                                    "client_can_view_report": True,
+                                    "attempts_count": 12
+                                }
+                            ],
+                            "pagination": {
+                                "total": 15,
+                                "page": 1,
+                                "limit": 20,
+                                "total_pages": 1,
+                                "has_next": False,
+                                "has_prev": False
+                            }
+                        },
+                        "errors": None
+                    }
+                }
+            }
+        }
+    }
 )
 async def get_tests_endpoint(
     request: Request,
@@ -170,7 +381,78 @@ async def get_tests_endpoint(
     "/{test_id}",
     response_model=SuccessResponse,
     summary="Получить тест",
-    description="Получает тест со всей структурой (секции, вопросы, опции, поля профиля, метрики, шаблоны)"
+    description="""
+    Получает тест со всей структурой одним запросом.
+    
+    **Возвращает:**
+    - Базовую информацию о тесте
+    - Все секции
+    - Все вопросы с вариантами ответов
+    - Поля профиля клиента
+    - Метрики и формулы
+    - Шаблоны отчетов
+    
+    **Доступ:**
+    - Только владелец теста (психолог, создавший тест)
+    """,
+    responses={
+        200: {
+            "description": "Тест найден",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Тест найден",
+                        "data": {
+                            "id": 1,
+                            "title": "Тест на профориентацию",
+                            "public_link_token": "abc123xyz",
+                            "access_until": "2026-12-31T23:59:59",
+                            "client_can_view_report": False,
+                            "attempts_count": 5,
+                            "sections": [
+                                {
+                                    "id": 1,
+                                    "title": "Личные качества",
+                                    "description": "Оцените свои качества",
+                                    "display_order": 1
+                                }
+                            ],
+                            "questions": [
+                                {
+                                    "id": 1,
+                                    "section_id": 1,
+                                    "question_text": "Как вы оцениваете свою коммуникабельность?",
+                                    "question_type": "rating",
+                                    "is_required": True,
+                                    "display_order": 1,
+                                    "settings": {"min": 1, "max": 10},
+                                    "options": []
+                                }
+                            ],
+                            "profile_fields": [],
+                            "metrics": [],
+                            "report_templates": []
+                        },
+                        "errors": None
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Тест не найден или нет доступа",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "message": "Тест с ID 999 не найден",
+                        "data": None,
+                        "errors": [{"field": "test_id", "message": "Тест с ID 999 не найден"}]
+                    }
+                }
+            }
+        }
+    }
 )
 async def get_test_endpoint(
     test_id: int,
@@ -334,7 +616,37 @@ async def delete_test_endpoint(
     "/{test_id}/link",
     response_model=SuccessResponse,
     summary="Получить публичную ссылку",
-    description="Получает публичную ссылку на тест для клиентов"
+    description="""
+    Получает публичную ссылку на тест для отправки клиентам.
+    
+    **Ссылка содержит:**
+    - Уникальный токен теста
+    - Полный URL для прохождения
+    
+    **Использование:**
+    - Скопируйте ссылку и отправьте клиенту
+    - Клиент может пройти тест без регистрации
+    """,
+    responses={
+        200: {
+            "description": "Публичная ссылка получена",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Публичная ссылка получена",
+                        "data": {
+                            "test_id": 1,
+                            "title": "Тест на профориентацию",
+                            "public_link": "http://localhost:8000/public/tests/abc123xyz",
+                            "public_link_token": "abc123xyz"
+                        },
+                        "errors": None
+                    }
+                }
+            }
+        }
+    }
 )
 async def get_test_link_endpoint(
     test_id: int,

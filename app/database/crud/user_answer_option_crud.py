@@ -14,8 +14,8 @@ async def create_answer_option(
         option_id=option_id
     )
     session.add(answer_option)
-    await session.commit()
-    await session.refresh(answer_option)
+    await session.flush()
+    # await session.refresh(answer_option)
     return answer_option
 
 
@@ -28,3 +28,4 @@ async def get_selected_options(
         .where(UserAnswerOption.user_answer_id == user_answer_id)
     )
     return list(result.scalars().all())
+

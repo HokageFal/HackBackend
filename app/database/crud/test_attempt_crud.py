@@ -17,8 +17,8 @@ async def create_attempt(
         started_at=datetime.utcnow()
     )
     session.add(attempt)
-    await session.commit()
-    await session.refresh(attempt)
+    await session.flush()
+    # await session.refresh(attempt)
     return attempt
 
 
@@ -69,8 +69,8 @@ async def submit_attempt(
     
     attempt.submitted_at = datetime.utcnow()
     
-    await session.commit()
-    await session.refresh(attempt)
+    await session.flush()
+    # await session.refresh(attempt)
     return attempt
 
 
@@ -84,5 +84,6 @@ async def delete_attempt(session: AsyncSession, attempt_id: int) -> bool:
         return False
     
     await session.delete(attempt)
-    await session.commit()
+    await session.flush()
     return True
+

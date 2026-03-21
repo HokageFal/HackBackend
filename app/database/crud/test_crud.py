@@ -23,8 +23,7 @@ async def create_test(
         attempts_count=0
     )
     session.add(test)
-    await session.commit()
-    await session.refresh(test)
+    await session.flush()
     return test
 
 
@@ -87,8 +86,7 @@ async def update_test(
     if client_can_view_report is not None:
         test.client_can_view_report = client_can_view_report
     
-    await session.commit()
-    await session.refresh(test)
+    await session.flush()
     return test
 
 
@@ -102,15 +100,22 @@ async def delete_test(session: AsyncSession, test_id: int) -> bool:
         return False
     
     await session.delete(test)
-    await session.commit()
+    await session.flush()
     return True
 
 
 async def increment_attempts_count(session: AsyncSession, test_id: int) -> bool:
     result = await session.execute(
-        update(Test)
+        select(Test)
         .where(Test.id == test_id)
-        .values(attempts_count=Test.attempts_count + 1)
+        .with_for_update()
     )
-    await session.commit()
-    return result.rowcount > 0
+    test = result.scalars().first()
+    
+    if not test:
+        return False
+    
+    test.attempts_count += 1
+    await session.flush()
+    return True
+
