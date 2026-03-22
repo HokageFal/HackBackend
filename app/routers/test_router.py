@@ -602,49 +602,64 @@ async def get_test_endpoint(
     response_model=SuccessResponse,
     summary="Обновить тест",
     description="""
-    Частично обновляет тест и его связанные данные.
+    Частично обновляет тест и его связанные данные. Использует ту же структуру, что и POST запрос создания.
     
-    **Что можно обновить:**
-    - Базовые поля теста (title, access_until, client_can_view_report)
-    - Поля профиля (profile_fields)
-    - Секции (sections)
-    - Вопросы с опциями (questions)
-    - Метрики (metrics)
-    - Шаблоны отчетов (report_templates)
+    **Структура запроса (идентична POST):**
+    - `test` - базовые настройки теста (опционально)
+    - `sections` - секции/разделы теста (опционально)
+    - `questions` - вопросы с вариантами ответов (опционально)
+    - `profile_fields` - дополнительные поля профиля клиента (опционально)
+    - `metrics` - формулы для расчета метрик (опционально)
+    - `report_templates` - шаблоны отчетов (опционально)
     
     **Логика обновления:**
-    - Передавайте только те поля, которые нужно изменить
-    - Для вложенных данных: если указан `id` - обновляется, если нет - создается новый
-    - Элементы, не указанные в массиве, будут удалены (только если массив передан)
+    - Если указан `id` - обновляется существующий элемент
+    - Если указан `temp_id` - создается новый элемент
+    - Элементы без `id` в переданном массиве будут удалены
     - Если массив не передан - существующие данные не изменяются
     
+    **Связи (как в POST):**
+    - Используйте `temp_id` в секциях для связи с новыми вопросами
+    - В вопросах указывайте `section_id` = `id` существующей секции или `temp_id` новой
+    - Варианты ответов (`options`) вкладываются прямо в вопрос
+    
     **Примеры:**
-    - Обновить только название: `{"title": "Новое название"}`
-    - Обновить название и добавить секцию: `{"title": "...", "sections": [...]}`
-    - Обновить только вопросы: `{"questions": [...]}`
+    ```json
+    // Обновить только название
+    {"test": {"title": "Новое название"}}
+    
+    // Обновить секцию и добавить новую
+    {
+      "sections": [
+        {"id": 1, "title": "Обновленная секция", "display_order": 1},
+        {"temp_id": "new_sec", "title": "Новая секция", "display_order": 2}
+      ]
+    }
+    
+    // Обновить вопрос и добавить новый
+    {
+      "questions": [
+        {"id": 5, "question_text": "Обновленный вопрос", "section_id": 1},
+        {"temp_id": "new_q", "question_text": "Новый вопрос", "section_id": "new_sec"}
+      ]
+    }
+    ```
     """
 )
 async def update_test_endpoint(
     test_id: int,
-    test_data: TestUpdate,
+    test_data: dict,
     request: Request,
     session: AsyncSession = Depends(get_db)
 ):
     try:
         psychologist = await get_current_psychologist(request, session)
         
-        test = await update_test_service(session, test_id, psychologist.id, test_data)
+        result = await update_test_service(session, test_id, psychologist.id, test_data)
         
         return create_success_response(
             message="Тест успешно обновлен",
-            data={
-                "id": test.id,
-                "title": test.title,
-                "public_link_token": test.public_link_token,
-                "access_until": test.access_until.isoformat() if test.access_until else None,
-                "client_can_view_report": test.client_can_view_report,
-                "attempts_count": test.attempts_count
-            }
+            data=result
         )
     
     except AccessDeniedError as e:

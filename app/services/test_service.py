@@ -339,8 +339,326 @@ async def update_test_service(
     session: AsyncSession,
     test_id: int,
     psychologist_id: int,
-    test_data: TestUpdate
-) -> Test:
+    test_data: dict
+) -> dict:
+    """Обновление теста со всеми вложенными данными (структура как в create_test_service)"""
+    from app.database.crud.test_profile_field_crud import (
+        create_profile_field, 
+        update_profile_field, 
+        delete_profile_field,
+        get_profile_fields_by_test
+    )
+    from app.database.crud.test_section_crud import (
+        create_section, 
+        update_section, 
+        delete_section,
+        get_sections_by_test
+    )
+    from app.database.crud.question_crud import (
+        create_question, 
+        update_question, 
+        delete_question,
+        get_questions_by_test
+    )
+    from app.database.crud.question_option_crud import (
+        create_option, 
+        update_option, 
+        delete_option,
+        get_options_by_question
+    )
+    from app.database.crud.test_metric_crud import (
+        create_metric, 
+        update_metric, 
+        delete_metric,
+        get_metrics_by_test
+    )
+    from app.database.crud.report_template_crud import (
+        create_report_template, 
+        update_report_template, 
+        delete_report_template,
+        get_report_templates_by_test
+    )
+    from app.database.models.enums import ProfileFieldType, QuestionType, ReportAudience
+    
+    logger.info(
+        "Starting test update",
+        operation="update_test_service",
+        test_id=test_id,
+        psychologist_id=psychologist_id
+    )
+    
+    try:
+        test = await get_test_by_id(session, test_id)
+        
+        if not test:
+            logger.warning(
+                "Test not found",
+                operation="update_test_service",
+                test_id=test_id,
+                reason="test_not_found"
+            )
+            raise TestNotFound("test_id", f"Тест с ID {test_id} не найден")
+        
+        if test.psychologist_id != psychologist_id:
+            logger.warning(
+                "Test access denied",
+                operation="update_test_service",
+                test_id=test_id,
+                psychologist_id=psychologist_id,
+                reason="access_denied"
+            )
+            raise TestAccessDenied("test_id", "У вас нет доступа к этому тесту")
+        
+        # Обновляем базовые поля теста
+        if "test" in test_data:
+            base_data = test_data["test"]
+            if "title" in base_data:
+                test.title = base_data["title"]
+            if "access_until" in base_data:
+                access_until_naive = None
+                if base_data["access_until"]:
+                    access_until_naive = convert_to_msk_naive(
+                        datetime.fromisoformat(base_data["access_until"]) 
+                        if isinstance(base_data["access_until"], str) 
+                        else base_data["access_until"]
+                    )
+                test.access_until = access_until_naive
+            if "client_can_view_report" in base_data:
+                test.client_can_view_report = base_data["client_can_view_report"]
+        
+        # Обновляем секции
+        if "sections" in test_data:
+            existing_sections = await get_sections_by_test(session, test_id)
+            existing_ids = {s.id for s in existing_sections}
+            updated_ids = set()
+            section_id_map = {}
+            
+            for section_data in test_data["sections"]:
+                section_id = section_data.get("id")
+                temp_id = section_data.get("temp_id")
+                
+                if section_id and section_id in existing_ids:
+                    # Обновляем существующую секцию
+                    await update_section(
+                        session, section_id,
+                        title=section_data.get("title"),
+                        position=section_data.get("display_order")
+                    )
+                    updated_ids.add(section_id)
+                    if temp_id:
+                        section_id_map[temp_id] = section_id
+                else:
+                    # Создаем новую секцию
+                    new_section = await create_section(
+                        session, test_id,
+                        title=section_data.get("title"),
+                        display_order=section_data.get("display_order", 0)
+                    )
+                    updated_ids.add(new_section.id)
+                    if temp_id:
+                        section_id_map[temp_id] = new_section.id
+            
+            # Удаляем секции, которых нет в обновлении
+            for section_id in existing_ids - updated_ids:
+                await delete_section(session, section_id)
+        else:
+            section_id_map = {}
+        
+        # Обновляем поля профиля
+        if "profile_fields" in test_data:
+            existing_fields = await get_profile_fields_by_test(session, test_id)
+            existing_ids = {f.id for f in existing_fields}
+            updated_ids = set()
+            
+            for field_data in test_data["profile_fields"]:
+                field_id = field_data.get("id")
+                
+                if field_id and field_id in existing_ids:
+                    # Обновляем существующее поле
+                    await update_profile_field(
+                        session, field_id,
+                        label=field_data.get("field_name") or field_data.get("label"),
+                        field_type=ProfileFieldType(field_data.get("field_type")) if field_data.get("field_type") else None,
+                        is_required=field_data.get("is_required"),
+                        position=field_data.get("display_order")
+                    )
+                    updated_ids.add(field_id)
+                else:
+                    # Создаем новое поле
+                    new_field = await create_profile_field(
+                        session, test_id,
+                        label=field_data.get("field_name") or field_data.get("label"),
+                        field_type=ProfileFieldType(field_data.get("field_type")),
+                        is_required=field_data.get("is_required", True),
+                        position=field_data.get("display_order", 0)
+                    )
+                    updated_ids.add(new_field.id)
+            
+            # Удаляем поля, которых нет в обновлении
+            for field_id in existing_ids - updated_ids:
+                await delete_profile_field(session, field_id)
+        
+        # Обновляем вопросы
+        if "questions" in test_data:
+            existing_questions = await get_questions_by_test(session, test_id)
+            existing_ids = {q.id for q in existing_questions}
+            updated_ids = set()
+            
+            for q_data in test_data["questions"]:
+                question_id = q_data.get("id")
+                section_ref = q_data.get("section_id")
+                # Преобразуем section_id через map если это temp_id
+                section_id = section_id_map.get(section_ref, section_ref)
+                
+                if question_id and question_id in existing_ids:
+                    # Обновляем существующий вопрос
+                    await update_question(
+                        session, question_id,
+                        section_id=section_id,
+                        question_text=q_data.get("question_text"),
+                        question_type=QuestionType(q_data.get("question_type")) if q_data.get("question_type") else None,
+                        is_required=q_data.get("is_required"),
+                        display_order=q_data.get("display_order"),
+                        settings_json=q_data.get("settings")
+                    )
+                    updated_ids.add(question_id)
+                else:
+                    # Создаем новый вопрос
+                    new_question = await create_question(
+                        session, test_id,
+                        section_id=section_id,
+                        question_text=q_data.get("question_text"),
+                        question_type=QuestionType(q_data.get("question_type")),
+                        is_required=q_data.get("is_required", True),
+                        display_order=q_data.get("display_order", 0),
+                        settings=q_data.get("settings")
+                    )
+                    question_id = new_question.id
+                    updated_ids.add(question_id)
+                
+                # Обновляем опции вопроса
+                if "options" in q_data:
+                    existing_options = await get_options_by_question(session, question_id)
+                    existing_option_ids = {o.id for o in existing_options}
+                    updated_option_ids = set()
+                    
+                    for opt_data in q_data["options"]:
+                        option_id = opt_data.get("id")
+                        
+                        if option_id and option_id in existing_option_ids:
+                            # Обновляем существующую опцию
+                            await update_option(
+                                session, option_id,
+                                option_text=opt_data.get("option_text"),
+                                option_value=opt_data.get("option_value"),
+                                position=opt_data.get("display_order")
+                            )
+                            updated_option_ids.add(option_id)
+                        else:
+                            # Создаем новую опцию
+                            new_option = await create_option(
+                                session, question_id,
+                                option_text=opt_data.get("option_text"),
+                                option_value=opt_data.get("option_value"),
+                                display_order=opt_data.get("display_order", 0)
+                            )
+                            updated_option_ids.add(new_option.id)
+                    
+                    # Удаляем опции, которых нет в обновлении
+                    for option_id in existing_option_ids - updated_option_ids:
+                        await delete_option(session, option_id)
+            
+            # Удаляем вопросы, которых нет в обновлении
+            for question_id in existing_ids - updated_ids:
+                await delete_question(session, question_id)
+        
+        # Обновляем метрики
+        if "metrics" in test_data:
+            existing_metrics = await get_metrics_by_test(session, test_id)
+            existing_ids = {m.id for m in existing_metrics}
+            updated_ids = set()
+            
+            for m_data in test_data["metrics"]:
+                metric_id = m_data.get("id")
+                
+                if metric_id and metric_id in existing_ids:
+                    # Обновляем существующую метрику
+                    await update_metric(
+                        session, metric_id,
+                        metric_name=m_data.get("metric_name"),
+                        formula=m_data.get("formula"),
+                        description=m_data.get("description")
+                    )
+                    updated_ids.add(metric_id)
+                else:
+                    # Создаем новую метрику
+                    new_metric = await create_metric(
+                        session, test_id,
+                        metric_name=m_data.get("metric_name"),
+                        formula=m_data.get("formula"),
+                        description=m_data.get("description")
+                    )
+                    updated_ids.add(new_metric.id)
+            
+            # Удаляем метрики, которых нет в обновлении
+            for metric_id in existing_ids - updated_ids:
+                await delete_metric(session, metric_id)
+        
+        # Обновляем шаблоны отчетов
+        if "report_templates" in test_data:
+            existing_templates = await get_report_templates_by_test(session, test_id)
+            existing_ids = {t.id for t in existing_templates}
+            updated_ids = set()
+            
+            for t_data in test_data["report_templates"]:
+                template_id = t_data.get("id")
+                
+                if template_id and template_id in existing_ids:
+                    # Обновляем существующий шаблон
+                    await update_report_template(
+                        session, template_id,
+                        audience=ReportAudience(t_data.get("audience")) if t_data.get("audience") else None,
+                        template_definition=t_data.get("template_definition")
+                    )
+                    updated_ids.add(template_id)
+                else:
+                    # Создаем новый шаблон
+                    new_template = await create_report_template(
+                        session, test_id,
+                        audience=ReportAudience(t_data.get("audience")),
+                        template_definition=t_data.get("template_definition", {})
+                    )
+                    updated_ids.add(new_template.id)
+            
+            # Удаляем шаблоны, которых нет в обновлении
+            for template_id in existing_ids - updated_ids:
+                await delete_report_template(session, template_id)
+        
+        await session.flush()
+        await session.commit()
+        await session.refresh(test)
+        
+        logger.info(
+            "Test updated successfully",
+            operation="update_test_service",
+            test_id=test_id
+        )
+        
+        return await get_test_by_id_service(session, test_id, psychologist_id)
+        
+    except (TestNotFound, TestAccessDenied):
+        raise
+    except Exception as e:
+        await session.rollback()
+        logger.error(
+            "Unexpected error during test update",
+            operation="update_test_service",
+            test_id=test_id,
+            error_type=type(e).__name__,
+            error_message=str(e),
+            exc_info=True
+        )
+        raise
     """Обновление теста со всеми вложенными данными"""
     from app.database.crud.test_profile_field_crud import (
         create_profile_field, 
