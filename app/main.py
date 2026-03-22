@@ -115,6 +115,7 @@ app.add_middleware(
 app.include_router(user_router, tags=["Users"])
 app.include_router(psychologist_router, tags=["Admin - Psychologists"])
 app.include_router(psychologist_profile_router, tags=["Psychologist Profile"])
+
 app.include_router(test_router, tags=["Tests"])
 app.include_router(attempt_router, tags=["Attempts"])
 app.include_router(public_router, tags=["Public"])
