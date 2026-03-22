@@ -84,8 +84,7 @@ async def login_user_endpoint(user_login: UserLogin,
     "/refresh",
     response_model=AuthSuccessResponse,
     status_code=200,
-    responses=REFRESH_TOKEN_RESPONSES,
-    dependencies=[Depends(verify_csrf)]  # CSRF защита
+    responses=REFRESH_TOKEN_RESPONSES
 )
 async def refresh_access_token(request: Request, response: Response):
     try:
@@ -127,11 +126,9 @@ async def refresh_access_token(request: Request, response: Response):
 )
 async def get_current_user(request: Request, session: AsyncSession = Depends(get_db)):
     try:
-        # Получаем ID пользователя из токена
-        user_id = get_user_id_from_token(request)
+        from app.core.dependencies import get_current_active_user, AccessDeniedError
         
-        # Получаем пользователя из базы данных
-        user = await get_current_user_service(session, user_id)
+        user = await get_current_active_user(request, session)
         
         return create_user_data_response(
             message="Данные пользователя получены успешно",
@@ -149,12 +146,20 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
                 "created_at": user.created_at.isoformat() if user.created_at else None
             }
         )
+    
+    except AccessDeniedError as e:
+        raise create_forbidden_error(
+            field=e.field,
+            message=e.message,
+            input_data="",
+            reason="Access denied"
+        )
         
     except UserNotFound as e:
         raise create_not_found_error(
             field=e.field,
             message=e.message,
-            input_data=user_id,
+            input_data="",
             reason="User not found in database"
         )
         
@@ -394,5 +399,63 @@ async def upload_user_photo(
     except HTTPException:
         raise
         
+    except Exception:
+        raise create_server_error()
+
+
+
+@router.get(
+    "/me/status",
+    response_model=SuccessResponse,
+    status_code=200,
+    summary="Проверить статус аккаунта",
+    description="""
+    Легковесный эндпоинт для проверки статуса аккаунта.
+    
+    Фронтенд должен вызывать этот эндпоинт каждые 30-60 секунд
+    чтобы проверить не заблокирован ли пользователь и не истек ли срок доступа.
+    
+    Если аккаунт заблокирован или срок истек - вернет 403 ошибку.
+    """
+)
+async def check_user_status(
+    request: Request,
+    session: AsyncSession = Depends(get_db)
+):
+    try:
+        from app.core.dependencies import get_current_active_user, AccessDeniedError
+        
+        user = await get_current_active_user(request, session)
+        
+        # Для психологов проверяем срок доступа
+        if user.role == UserRoleEnum.psychologist and user.access_until:
+            from app.core.timezone_utils import get_current_msk_time
+            now = get_current_msk_time()
+            if user.access_until < now:
+                raise AccessDeniedError(
+                    field="access_until",
+                    message=f"Срок доступа истек {user.access_until.strftime('%d.%m.%Y')}. Обратитесь к администратору"
+                )
+        
+        return create_success_response(
+            message="Статус аккаунта в порядке",
+            data={
+                "is_blocked": user.is_blocked,
+                "access_until": user.access_until.isoformat() if user.access_until else None,
+                "is_active": True
+            }
+        )
+    
+    except AccessDeniedError as e:
+        raise create_forbidden_error(
+            field=e.field,
+            message=e.message,
+            input_data="",
+            reason="Access denied"
+        )
+    
+    except HTTPException:
+        raise
+    
     except Exception:
         raise create_server_error()

@@ -26,5 +26,9 @@ class Settings:
     OTP_EXPIRE_MINUTES: int = int(os.getenv("OTP_EXPIRE_MINUTES", "10"))
     OTP_MAX_ATTEMPTS: int = int(os.getenv("OTP_MAX_ATTEMPTS", "3"))
     OTP_RATE_LIMIT_MINUTES: int = int(os.getenv("OTP_RATE_LIMIT_MINUTES", "1"))
+    
+    # URLs
+    BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 settings = Settings()

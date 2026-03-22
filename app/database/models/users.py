@@ -1,8 +1,8 @@
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Integer, TIMESTAMP, Enum, func, Text, Boolean, Date
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import String, Integer, TIMESTAMP, Enum, func, Text, Boolean, DateTime
 from app.database.core import Base
 import enum
-from datetime import date
+from datetime import datetime
 
 
 class UserRoleEnum(str, enum.Enum):
@@ -24,11 +24,13 @@ class User(Base):
     )
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     
-    # Поля для ролей и управления доступом
     role: Mapped[UserRoleEnum] = mapped_column(
         Enum(UserRoleEnum), default=UserRoleEnum.psychologist, nullable=False
     )
     about_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
     public_card_token: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
-    access_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    access_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    tests: Mapped[list["Test"]] = relationship("Test", back_populates="psychologist")
+

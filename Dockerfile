@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --timeout 60 --retries 5 --prefix=/install -r requirements.txt
 
 # Stage 2: Final
 FROM python:3.11-slim-bookworm

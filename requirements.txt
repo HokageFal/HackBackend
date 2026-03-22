@@ -17,3 +17,6 @@ celery[redis]
 redis
 email-validator
 sqladmin[full]
+python-docx
+qrcode[pil]
+pillow

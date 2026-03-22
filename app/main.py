@@ -10,6 +10,10 @@ import os
 
 from app.routers.user_router import router as user_router
 from app.routers.psychologist_router import router as psychologist_router
+from app.routers.psychologist_profile_router import router as psychologist_profile_router
+from app.routers.test_router import router as test_router
+from app.routers.public_router import router as public_router
+from app.routers.attempt_router import router as attempt_router
 from app.init_admin import init_admin
 import logging
 
@@ -110,6 +114,10 @@ app.add_middleware(
 # API routes
 app.include_router(user_router, tags=["Users"])
 app.include_router(psychologist_router, tags=["Admin - Psychologists"])
+app.include_router(psychologist_profile_router, tags=["Psychologist Profile"])
+app.include_router(test_router, tags=["Tests"])
+app.include_router(attempt_router, tags=["Attempts"])
+app.include_router(public_router, tags=["Public"])
 
 
 @app.exception_handler(RequestValidationError)

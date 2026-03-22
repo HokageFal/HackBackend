@@ -88,6 +88,8 @@ async def delete_user_service(session: AsyncSession, user_id: int) -> bool:
             )
             raise Exception("Не удалось удалить пользователя")
         
+        await session.commit()
+        
         logger.info(
             "User deleted successfully",
             operation="delete_user_service",

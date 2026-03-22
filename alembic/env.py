@@ -8,7 +8,20 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 # Загружаем Base и модели
 from app.database.core import Base
-from app.database.models.users import User
+from app.database.models import (
+    User,
+    Test,
+    TestProfileField,
+    TestSection,
+    Question,
+    QuestionOption,
+    TestMetric,
+    ReportTemplate,
+    TestAttempt,
+    TestAttemptProfileValue,
+    UserAnswer,
+    UserAnswerOption
+)
 
 # Загружаем переменные окружения из .env
 from dotenv import load_dotenv
